@@ -5,24 +5,26 @@ android {
     buildToolsVersion "21.1.2"
 
     defaultConfig {
-        applicationId "com.syncedsynapse.kore2"
+        applicationId "org.xbmc.kore"
         minSdkVersion 15
         targetSdkVersion 21
-        versionCode 4
-        versionName "0.9.2"
-
-        buildConfigField("String", "IAP_KEY", "\"${rootProject.property("IAP_KEY")}\"")
+        versionCode 9
+        versionName "1.2.1"
     }
+
+    File keystoreFile = file('keystore.properties')
 
     signingConfigs {
         release {
-            def Properties keyProps = new Properties()
-            keyProps.load(new FileInputStream(file('keystore.properties')))
+            if (keystoreFile.exists()) {
+                def Properties keyProps = new Properties()
+                keyProps.load(new FileInputStream(keystoreFile))
 
-            storeFile file(keyProps["store"])
-            keyAlias keyProps["alias"]
-            storePassword keyProps["storePass"]
-            keyPassword keyProps["pass"]
+                storeFile file(keyProps["store"])
+                keyAlias keyProps["alias"]
+                storePassword keyProps["storePass"]
+                keyPassword keyProps["pass"]
+            }
         }
     }
 
@@ -33,11 +35,26 @@ android {
 //        }
 
         release {
-            signingConfig signingConfigs.release
+            if (keystoreFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
+    lintOptions {
+        // Too much trouble keeping all translations in sync
+        disable 'MissingTranslation'
+    }
+
+//    allprojects {
+//        gradle.projectsEvaluated {
+//            tasks.withType(JavaCompile) {
+//                options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+//            }
+//        }
+//    }
 
     packagingOptions {
         exclude 'META-INF/DEPENDENCIES'

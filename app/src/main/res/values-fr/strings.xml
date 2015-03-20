@@ -271,23 +271,22 @@
 
     <string name="about">À propos</string>
     <string name="about_desc"><![CDATA[
-        \u00A9 2015 Synced Synapse.<br><br>
-        Évaluez-nous sur <b><a href="market://details?id=com.syncedsynapse.kore2">Google Play</a></b><br><br>
+        \u00A9 2015 XBMC Foundation.<br><br>
+        Évaluez-nous sur <b><a href="market://details?id=org.xbmc.kore">Google Play</a></b><br><br>
 
-        Si vous avez besoin d\'aide, consultez la <b><a href="http://syncedsynapse.com/kore/kore-faq/">FAQ</a></b> ou
-        rejoignez la <b><a href="https://plus.google.com/u/0/communities/110340113064213296333">Communauté Google+</a></b> de Kore
+        Si vous avez besoin d\'aide, consultez le <b><a href="http://forum.kodi.tv/forumdisplay.php?fid=129">forum</a></b>
     ]]></string>
 
-    <!-- String for coffee -->
-    <string name="buy_me_coffee">Achetez-moi un café</string>
-    <string name="expresso_please">Un expresso, s\'il vous plaît. Merci\u00A0!</string>
-    <string name="thanks_for_coffe">Merci pour le café\u00A0!</string>
-    <string name="remove_coffee_message">Appuyez pour masquer ce paramètre</string>
-    <string name="buy_coffee_to_unlock_themes">S\'il vous plaît achetez-moi un café pour débloquer plus de thèmes</string>
+    <!--&lt;!&ndash; String for coffee &ndash;&gt;-->
+    <!--<string name="buy_me_coffee">Achetez-moi un café</string>-->
+    <!--<string name="expresso_please">Un expresso, s\'il vous plaît. Merci\u00A0!</string>-->
+    <!--<string name="thanks_for_coffe">Merci pour le café\u00A0!</string>-->
+    <!--<string name="remove_coffee_message">Appuyez pour masquer ce paramètre</string>-->
+    <!--<string name="buy_coffee_to_unlock_themes">S\'il vous plaît achetez-moi un café pour débloquer plus de thèmes</string>-->
 
-    <string name="error_setting_up_billing">Impossible de configurer le service de facturation du Google Play\u00A0:\n%s</string>
-    <string name="error_querying_inventory">Échec.</string>
-    <string name="error_during_purchased">Erreur lors de l\'achat.</string>
-    <string name="purchase_thanks">Merci pour votre soutien\u00A0!</string>
+    <!--<string name="error_setting_up_billing">Impossible de configurer le service de facturation du Google Play\u00A0:\n%s</string>-->
+    <!--<string name="error_querying_inventory">Échec.</string>-->
+    <!--<string name="error_during_purchased">Erreur lors de l\'achat.</string>-->
+    <!--<string name="purchase_thanks">Merci pour votre soutien\u00A0!</string>-->
 
 </resources>

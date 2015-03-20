@@ -1,35 +1,51 @@
 Kore - Kodi/XBMC remote for Android
-====================================
+-----------------------------------
 
 GitHub repository for the [Kore][1] Android app.
 
-Kore is a simple and easy to use Kodi remote.
+Kore is the official remote for [Kodi](http://kodi.tv/), and aims to be a simple and easy to use  remote.
 
 
-Compiling
+Building
 ---------
-Git pull should get you almost all you need.
 
-You'll need to create the following files:
+1. Make sure you have a working [Android build system](http://developer.android.com/sdk/installing/studio-build.html);
+2. The version of Android SDK and Build Tools needed is specified in app/build.gradle. Make sure you have them installed;
+3. Install the version of [Android support library](http://developer.android.com/tools/support-library/setup.html) that is specified in app/gradle (dependencies section);
+4. Git pull
+5. Gradle should be able to fetch all the other needed libraries.
 
-1. `gradle.properties`, with the value `IAP_KEY` set to something (this is used for the in-app purchase).
-2. `app/keystore.properties` with the values `store`, `alias`, `pass`, `storePass` set. This is for signing the release build. Alternatively, comment the `signingConfigs` in `app/build.gradle`.
 
+Credits
+-------
 
+**Libraries used**
+- [Jackson](https://github.com/FasterXML/jackson)
+- [Butterknife](http://jakewharton.github.io/butterknife/)
+- [Picasso](http://square.github.io/picasso/)
+- [EventBus](https://github.com/greenrobot/EventBus)
+- [JmDNS](http://jmdns.sourceforge.net/)
+- [PagerSlidingTabStrip](https://github.com/astuetz/PagerSlidingTabStrip)
+- [FloatingActionButton](https://github.com/makovkastar/FloatingActionButton)
+
+**Translations**
+- French - Kowalski
+- Bulgarian - NEOhidra
+- German - jonas2515
+- Italian - Enrico Strocchi
 
 Links
 -----
 
-- [Website][2]
+- [Kodi forum thread](http://forum.kodi.tv/forumdisplay.php?fid=129)
 - [Google Play][1]
-- [Google+ community][3]
-
+- [Google+ community](https://plus.google.com/communities/115506510322045554124)
 
 
 License
 -------
 
-    Copyright 2014 Synced Synapse
+    Copyright 2015 XBMC Foundation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -44,8 +60,4 @@ License
     limitations under the License.
 
 
-[1]: https://play.google.com/store/apps/details?id=com.syncedsynapse.kore2
-[2]: http://syncedsynapse.com/kore/
-[3]: https://plus.google.com/u/0/communities/110340113064213296333
-
-
+[1]: https://play.google.com/store/apps/details?id=org.xbmc.kore
