@@ -18,6 +18,7 @@ package org.xbmc.kore.jsonrpc.method;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.xbmc.kore.jsonrpc.ApiException;
 import org.xbmc.kore.jsonrpc.ApiMethod;
 import org.xbmc.kore.jsonrpc.type.ListType;
@@ -52,7 +53,7 @@ public class Player {
         @Override
         public ArrayList<GetActivePlayersReturnType> resultFromJson(ObjectNode jsonObject) throws ApiException {
             ArrayNode resultNode = (ArrayNode)jsonObject.get(RESULT_NODE);
-            ArrayList<GetActivePlayersReturnType> res = new ArrayList<GetActivePlayersReturnType>();
+            ArrayList<GetActivePlayersReturnType> res = new ArrayList<>();
             if (resultNode != null) {
                 for (JsonNode node : resultNode) {
                     res.add(new GetActivePlayersReturnType(node));
@@ -115,7 +116,6 @@ public class Player {
             return new PlayerType.PropertyValue(jsonObject.get(RESULT_NODE));
         }
     }
-
 
     /**
      * Pauses or unpause playback and returns the new state
@@ -242,6 +242,12 @@ public class Player {
         public final static String METHOD_NAME = "Player.Seek";
 
         /**
+         * Seek constants
+         */
+        public static final String BACKWARD = "smallbackward";
+        public static final String FORWARD = "smallforward";
+
+        /**
          * Seek through the playing item (by time)
          * @param playerId Player id for which to stop playback
          * @param value Where to seek
@@ -249,7 +255,10 @@ public class Player {
         public Seek(int playerId, PlayerType.PositionTime value) {
             super();
             addParameterToRequest("playerid", playerId);
-            addParameterToRequest("value", value);
+            ObjectNode valueObject = objectMapper.createObjectNode();
+            if (value != null)
+                valueObject.set("time", value.toJsonNode());
+            addParameterToRequest("value", valueObject);
         }
 
         /**
@@ -260,7 +269,22 @@ public class Player {
         public Seek(int playerId, int value) {
             super();
             addParameterToRequest("playerid", playerId);
-            addParameterToRequest("value", value);
+            ObjectNode valueObject = objectMapper.createObjectNode();
+            valueObject.put("percentage", value);
+            addParameterToRequest("value", valueObject);
+        }
+
+        /**
+         * Seek through the playing item (by step)
+         * @param playerId Player id for which to stop playback
+         * @param value step (smallbackward/smallforward)
+         */
+        public Seek(int playerId, String value) {
+            super();
+            addParameterToRequest("playerid", playerId);
+            ObjectNode valueObject = objectMapper.createObjectNode();
+            valueObject.put("step", value);
+            addParameterToRequest("value", valueObject);
         }
 
         @Override
@@ -427,19 +451,60 @@ public class Player {
     }
 
     /**
+     * Set/Unset Party Mode on the player
+     */
+    public static final class SetPartymode extends ApiMethod<String> {
+        public final static String METHOD_NAME = "Player.SetPartymode";
+
+        /**
+         * Set/Unset Party Mode on the player
+         * @param playerId Player id for which to shuffle
+         * @param partymode True/false
+         */
+        public SetPartymode(int playerId, boolean partymode) {
+            super();
+            addParameterToRequest("playerid", playerId);
+            addParameterToRequest("partymode", partymode);
+        }
+
+        /**
+         * Set/Unset Party Mode on the player
+         * @param playerId Player id for which to shuffle
+         */
+        public SetPartymode(int playerId) {
+            super();
+            addParameterToRequest("playerid", playerId);
+            addParameterToRequest("partymode", "toggle");
+        }
+
+        @Override
+        public String getMethodName() { return METHOD_NAME; }
+
+        @Override
+        public String resultFromJson(ObjectNode jsonObject) throws ApiException {
+            return jsonObject.get(RESULT_NODE).textValue();
+        }
+    }
+
+    /**
      * Start playback of either the playlist with the given ID, a slideshow with the pictures
      * from the given directory or a single file or an item from the database.
      */
     public static final class Open extends ApiMethod<String> {
         public final static String METHOD_NAME = "Player.Open";
 
+        public final static String TYPE_PLAYLIST = "playlist",
+                TYPE_CHANNEL = "channel",
+                TYPE_RECORDING = "recording";
+
         /**
          * Start playback of either the playlist with the given ID, a slideshow with the pictures
          * from the given directory or a single file or an item from the database.
-         * @param playlistId
-         * @param position
+         * @param itemType This should always be TYPE_PLAYLIST
+         * @param playlistId Id
+         * @param position Position to start
          */
-        public Open(int playlistId, int position) {
+        public Open(String itemType, int playlistId, int position) {
             super();
             final ObjectNode item = objectMapper.createObjectNode();
             item.put("playlistid", playlistId);
@@ -458,13 +523,24 @@ public class Player {
         }
 
         /**
-         * Select the active player
-         * @param playlistId playlist ID to select
+         * Starts playing a playlist or channel
+         * @param itemType TYPE_PLAYLIST or TYPE_CHANNEL
+         * @param itemId Corresponding ID to open
          */
-        public Open(int playlistId) {
+        public Open(String itemType, int itemId) {
             super();
             final ObjectNode item = objectMapper.createObjectNode();
-            item.put("playlistid", playlistId);
+            switch (itemType) {
+                case TYPE_PLAYLIST:
+                    item.put("playlistid", itemId);
+                    break;
+                case TYPE_CHANNEL:
+                    item.put("channelid", itemId);
+                    break;
+                case TYPE_RECORDING:
+                    item.put("recordingid", itemId);
+                    break;
+            }
             addParameterToRequest("item", item);
         }
 
@@ -477,4 +553,29 @@ public class Player {
         }
     }
 
+    /**
+     * Send notification message to XBMC/Kodi
+     */
+    public static final class Notification extends ApiMethod<String> {
+        public final static String METHOD_NAME = "GUI.ShowNotification";
+
+        /**
+         * Sends a text notification message to XBMC/Kodi
+         * @param title The title of the notification
+         * @param message The text message of the notification
+         */
+        public Notification(String title, String message) {
+            super(false);
+            addParameterToRequest("title", title);
+            addParameterToRequest("message", message);
+        }
+
+        @Override
+        public String getMethodName() { return METHOD_NAME; }
+
+        @Override
+        public String resultFromJson(ObjectNode jsonObject) throws ApiException {
+            return jsonObject.get(RESULT_NODE).textValue();
+        }
+    }
 }

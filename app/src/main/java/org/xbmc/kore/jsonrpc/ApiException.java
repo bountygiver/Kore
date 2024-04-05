@@ -61,6 +61,11 @@ public class ApiException extends Exception {
 	public static final int HTTP_RESPONSE_CODE_NOT_FOUND = 6;
 
 	/**
+	 *
+	 */
+	public static final int HTTP_HOST_URL_INVALID = 7;
+
+	/**
 	 * API returned an error
 	 */
 	public static int API_ERROR = 100;
@@ -75,7 +80,11 @@ public class ApiException extends Exception {
      */
     public static int API_METHOD_WITH_SAME_ID_ALREADY_EXECUTING = 102;
 
-    private int code;
+    public static int API_WAITING_ON_RESULT_TIMEDOUT = 103;
+
+    public static int API_WAITING_ON_RESULT_INTERRUPTED = 104;
+
+    private final int code;
 
 	/**
 	 * Constructor

@@ -17,6 +17,7 @@ package org.xbmc.kore.jsonrpc.notification;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.xbmc.kore.jsonrpc.ApiNotification;
 import org.xbmc.kore.jsonrpc.type.GlobalType;
 import org.xbmc.kore.utils.JsonUtils;
@@ -25,6 +26,23 @@ import org.xbmc.kore.utils.JsonUtils;
  * All Player.* notifications
  */
 public class Player {
+
+    /**
+     * Player.OnPropertyChanged notification
+     * Player properties have changed. Such as repeat type and shuffle mode
+     */
+    public static class OnPropertyChanged extends ApiNotification {
+        public static final String  NOTIFICATION_NAME = "Player.OnPropertyChanged";
+
+        public final NotificationsData data;
+
+        public OnPropertyChanged(ObjectNode node) {
+            super(node);
+            data = new NotificationsData(node.get(NotificationsData.DATA_NODE));
+        }
+
+        public String getNotificationName() { return NOTIFICATION_NAME; }
+    }
 
     /**
      * Player.OnPause notification
@@ -54,6 +72,23 @@ public class Player {
         public final NotificationsData data;
 
         public OnPlay(ObjectNode node) {
+            super(node);
+            data = new NotificationsData(node.get(NotificationsData.DATA_NODE));
+        }
+
+        public String getNotificationName() { return NOTIFICATION_NAME; }
+    }
+
+    /**
+     * Player.OnResume notification
+     * Playback of a media item has been resumed. If there is no ID available extra information will be provided.
+     */
+    public static class OnResume extends ApiNotification {
+        public static final String  NOTIFICATION_NAME = "Player.OnResume";
+
+        public final NotificationsData data;
+
+        public OnResume(ObjectNode node) {
             super(node);
             data = new NotificationsData(node.get(NotificationsData.DATA_NODE));
         }
@@ -124,6 +159,42 @@ public class Player {
     }
 
     /**
+     * Player.OnAVStart notification
+     * Will be triggered on playback start if the first frame was drawn.
+     * If there is no ID available extra information will be provided
+     */
+    public static class OnAVStart extends ApiNotification {
+        public static final String  NOTIFICATION_NAME = "Player.OnAVStart";
+
+        public final NotificationsData data;
+
+        public OnAVStart(ObjectNode node) {
+            super(node);
+            data = new NotificationsData(node.get(NotificationsData.DATA_NODE));
+        }
+
+        public String getNotificationName() { return NOTIFICATION_NAME; }
+    }
+
+    /**
+     * Player.OnAVChange notification
+     * Audio- or videostream has changed.
+     * If there is no ID available extra information will be provided
+     */
+    public static class OnAVChange extends ApiNotification {
+        public static final String  NOTIFICATION_NAME = "Player.OnAVChange";
+
+        public final NotificationsData data;
+
+        public OnAVChange(ObjectNode node) {
+            super(node);
+            data = new NotificationsData(node.get(NotificationsData.DATA_NODE));
+        }
+
+        public String getNotificationName() { return NOTIFICATION_NAME; }
+    }
+
+    /**
      * Notification data for Player
      */
     public static class NotificationsPlayer {
@@ -179,15 +250,44 @@ public class Player {
         }
     }
 
+    /**
+     * Notification data for player properties
+     */
+    public static class NotificationsProperty {
+        public static final String PROPERTY_NODE = "property";
+
+        public final Boolean shuffled;
+        public final String repeatMode;
+        public final Boolean partymode;
+
+        public NotificationsProperty(JsonNode node) {
+            JsonNode propertyNode = node.get("shuffled");
+            shuffled = (propertyNode == null) ? null : propertyNode.asBoolean();
+            propertyNode = node.get("partymode");
+            partymode = (propertyNode == null) ? null : propertyNode.asBoolean();
+
+            repeatMode = JsonUtils.stringFromJsonNode(node, "repeat");
+        }
+    }
+
     public static class NotificationsData {
         public static final String DATA_NODE = "data";
 
         public final NotificationsPlayer player;
         public final NotificationsItem item;
+        public final NotificationsProperty property;
 
         public NotificationsData(JsonNode node) {
-            item = new NotificationsItem((ObjectNode)node.get(NotificationsItem.ITEM_NODE));
-            player = new NotificationsPlayer((ObjectNode)node.get(NotificationsPlayer.PLAYER_NODE));
+            JsonNode jsonNode = node.get(NotificationsItem.ITEM_NODE);
+            item = (jsonNode != null) ? new NotificationsItem(jsonNode) : null;
+
+            jsonNode = node.get(NotificationsPlayer.PLAYER_NODE);
+            player = (jsonNode != null)
+                     ? new NotificationsPlayer(jsonNode)
+                     : null;
+
+            jsonNode = node.get(NotificationsProperty.PROPERTY_NODE);
+            property = (jsonNode != null) ? new NotificationsProperty(jsonNode) : null;
         }
     }
 

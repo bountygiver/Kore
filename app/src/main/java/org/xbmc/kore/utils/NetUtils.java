@@ -15,19 +15,44 @@
  */
 package org.xbmc.kore.utils;
 
+import android.content.Context;
+import android.os.StatFs;
+
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
 import java.net.UnknownHostException;
+import java.util.Enumeration;
+import java.util.Locale;
 
 /**
  * Various utilities related to networking
  */
 public class NetUtils {
     private static final String TAG = LogUtils.makeLogTag(NetUtils.class);
+
+    /**
+     * Gets an IPv4 address from a host name
+     * @param host The host to look up
+     * @return Inet4Address
+     */
+    public static Inet4Address getInet4AddressByName(String host) throws UnknownHostException {
+        InetAddress[] addrs = InetAddress.getAllByName(host);
+        for (InetAddress addr : addrs) {
+            if (addr instanceof Inet4Address) {
+                return (Inet4Address)addr;
+            }
+        }
+        throw new UnknownHostException("No ipv4 address found");
+    }
 
     /**
      * Convert a IPv4 address from an integer to an InetAddress.
@@ -63,7 +88,7 @@ public class NetUtils {
             InetAddress inet = InetAddress.getByName(hostAddress);
 
             // Send some traffic, with a timeout
-            boolean reachable = inet.isReachable(1000);
+            inet.isReachable(1000);
 
             ipHostAddress = inet.getHostAddress();
         } catch (UnknownHostException e) {
@@ -73,7 +98,10 @@ public class NetUtils {
             LogUtils.LOGD(TAG, "Couldn't check reachability of host: " + hostAddress, e);
             return null;
         }
+        if (ipHostAddress == null) return null;
 
+        // Try to read the arp cache. This is only possible on Android < 10
+        // https://developer.android.com/about/versions/10/privacy/changes#proc-net-filesystem
         try {
             // Read the arp cache
             BufferedReader br = new BufferedReader(new FileReader("/proc/net/arp"));
@@ -83,13 +111,39 @@ public class NetUtils {
                 if (arpLine.startsWith(ipHostAddress)) {
                     // Ok, this is the line, get the MAC Address
                     br.close();
-                    return arpLine.split("\\s+")[3].toUpperCase(); // 4th element
+                    return arpLine.split("\\s+")[3].toUpperCase(Locale.US); // 4th element
                 }
             }
             br.close();
         } catch (IOException e) {
             LogUtils.LOGD(TAG, "Couldn check ARP cache.", e);
         }
+
+        // Couldn't read arp cache, try to exec ip neigh show
+        // This apparently only works up until Android 11...
+        try {
+            String cmd = "ip neigh show";
+            Process process = Runtime.getRuntime().exec(cmd);
+            int res = process.waitFor();
+            BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            LogUtils.LOGD(TAG, cmd + " res: " + res + ", output:\n");
+
+            String line;
+            while ((line = br.readLine()) != null) {
+                LogUtils.LOGD(TAG, line);
+                if (line.startsWith(ipHostAddress)) {
+                    // Ok, this is the line, get the MAC Address
+                    br.close();
+                    LogUtils.LOGD(TAG, "Located line: " + line + ", returning " + line.split("\\s+")[4].toUpperCase(Locale.US));
+                    return line.split("\\s+")[4].toUpperCase(Locale.US); // 4th element
+                }
+            }
+            br.close();
+        } catch (IOException | InterruptedException e) {
+            LogUtils.LOGD(TAG, "Couldn't execute 'ip neigh show' to get the Mac Address", e);
+        }
+
+
         return null;
     }
 
@@ -109,7 +163,7 @@ public class NetUtils {
 
         // Get MAC adress bytes
         byte[] macAddressBytes = new byte[6];
-        String[] hex = macAddress.split("(\\:|\\-)");
+        String[] hex = macAddress.split("([:\\-])");
         if (hex.length != 6) {
             LogUtils.LOGD(TAG, "Send magic packet: got an invalid MAC address: " + macAddress);
             return false;
@@ -137,7 +191,32 @@ public class NetUtils {
             InetAddress address = InetAddress.getByName(hostAddress);
             DatagramPacket packet = new DatagramPacket(bytes, bytes.length, address, port);
             DatagramSocket socket = new DatagramSocket();
+            LogUtils.LOGD(TAG, "Sending WoL to " + address.getHostAddress() + ":" + port);
             socket.send(packet);
+
+            // Piece of code apprehended from here:  http://stackoverflow.com/a/29017289
+            // Check all the existing interfaces that can be broadcasted to
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface networkInterface = interfaces.nextElement();
+
+                if (networkInterface.isLoopback())
+                    continue; // Don't want to broadcast to the loopback interface
+
+                for (InterfaceAddress interfaceAddress : networkInterface.getInterfaceAddresses()) {
+                    InetAddress broadcast = interfaceAddress.getBroadcast();
+                    // Android seems smart enough to set to null broadcast to
+                    //  the external mobile network. It makes sense since Android
+                    //  silently drop UDP broadcasts involving external mobile network.
+                    // Automatically skip IPv6 as it has broadcast IP null
+                    if (broadcast != null) {
+                        LogUtils.LOGD(TAG, "Sending WoL broadcast to " + broadcast.getHostAddress() + ":" + port);
+                        // Broadcasts WOL Magic Packet to every possible broadcast address
+                        packet = new DatagramPacket(bytes, bytes.length, broadcast, port);
+                        socket.send(packet);
+                    }
+                }
+            }
             socket.close();
         } catch (IOException e) {
             LogUtils.LOGD(TAG, "Exception while sending magic packet.", e);
@@ -148,7 +227,7 @@ public class NetUtils {
 
     private static byte[] getMacBytes(String macStr) throws IllegalArgumentException {
         byte[] bytes = new byte[6];
-        String[] hex = macStr.split("(\\:|\\-)");
+        String[] hex = macStr.split("([:\\-])");
         if (hex.length != 6) {
             throw new IllegalArgumentException("Invalid MAC address.");
         }
@@ -161,5 +240,39 @@ public class NetUtils {
             throw new IllegalArgumentException("Invalid hex digit in MAC address.");
         }
         return bytes;
+    }
+
+    /**
+     * Utility functions to create a cache for images, used with the picasso library
+     * Lifted from com.squareup.picasso.Utils
+     */
+    private static final String APP_CACHE = "app-cache";
+    private static final int MIN_DISK_CACHE_SIZE = 8 * 1024 * 1024; // 8 MB
+    private static final int MAX_DISK_CACHE_SIZE = 256 * 1024 * 1024; // 256 MB
+
+    public static File createDefaultCacheDir(Context context) {
+        File cache = new File(context.getApplicationContext().getCacheDir(), APP_CACHE);
+        if (!cache.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            cache.mkdirs();
+        }
+        return cache;
+    }
+
+    public static long calculateDiskCacheSize(File dir) {
+        long size = MIN_DISK_CACHE_SIZE;
+
+        try {
+            StatFs statFs = new StatFs(dir.getAbsolutePath());
+            long blockCount = statFs.getBlockCountLong();
+            long blockSize = statFs.getBlockSizeLong();
+            long available = blockCount * blockSize;
+            // Target 2% of the total space.
+            size = available / 50;
+        } catch (IllegalArgumentException ignored) {
+        }
+
+        // Bound inside min/max size for disk cache.
+        return Math.max(Math.min(size, MAX_DISK_CACHE_SIZE), MIN_DISK_CACHE_SIZE);
     }
 }

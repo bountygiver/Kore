@@ -51,7 +51,7 @@ public class Playlist {
         @Override
         public ArrayList<GetPlaylistsReturnType> resultFromJson(ObjectNode jsonObject) throws ApiException {
             ArrayNode resultNode = (ArrayNode)jsonObject.get(RESULT_NODE);
-            ArrayList<GetPlaylistsReturnType> res = new ArrayList<GetPlaylistsReturnType>();
+            ArrayList<GetPlaylistsReturnType> res = new ArrayList<>();
             if (resultNode != null) {
                 for (JsonNode node : resultNode) {
                     res.add(new GetPlaylistsReturnType(node));
@@ -87,10 +87,10 @@ public class Playlist {
             JsonNode resultNode = jsonObject.get(RESULT_NODE);
             if (!resultNode.has("items") || (!resultNode.get("items").isArray()) ||
                     ((resultNode.get("items")).size() == 0)) {
-                return new ArrayList<ListType.ItemsAll>(0);
+                return new ArrayList<>(0);
             }
             ArrayNode items = (ArrayNode)resultNode.get("items");
-            ArrayList<ListType.ItemsAll> result = new ArrayList<ListType.ItemsAll>(items.size());
+            ArrayList<ListType.ItemsAll> result = new ArrayList<>(items.size());
 
             for (JsonNode item : items) {
                 result.add(new ListType.ItemsAll(item));
@@ -159,6 +159,29 @@ public class Playlist {
         public Add(int playlistId, PlaylistType.Item item) {
             super();
             addParameterToRequest("playlistid", playlistId);
+            addParameterToRequest("item", item);
+        }
+
+        @Override
+        public String getMethodName() { return METHOD_NAME; }
+
+        @Override
+        public String resultFromJson(ObjectNode jsonObject) throws ApiException {
+            return jsonObject.get(RESULT_NODE).textValue();
+        }
+    }
+
+
+    public static final class Insert extends ApiMethod<String> {
+        public final static String METHOD_NAME = "Playlist.Insert";
+
+        /**
+         * Add item(s) to playlist
+         */
+        public Insert(int playlistId, int position, PlaylistType.Item item) {
+            super();
+            addParameterToRequest("playlistid", playlistId);
+            addParameterToRequest("position", position);
             addParameterToRequest("item", item);
         }
 

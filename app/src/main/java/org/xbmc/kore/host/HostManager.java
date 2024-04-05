@@ -17,19 +17,40 @@ package org.xbmc.kore.host;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
-import android.preference.PreferenceManager;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.format.DateUtils;
 
+import androidx.annotation.NonNull;
+import androidx.core.content.pm.ShortcutInfoCompat;
+import androidx.core.content.pm.ShortcutManagerCompat;
+import androidx.core.graphics.drawable.IconCompat;
+import androidx.preference.PreferenceManager;
+
+import com.squareup.picasso.OkHttp3Downloader;
 import com.squareup.picasso.Picasso;
-import org.xbmc.kore.Settings;
-import org.xbmc.kore.jsonrpc.HostConnection;
-import org.xbmc.kore.provider.MediaContract;
-import org.xbmc.kore.utils.BasicAuthPicassoDownloader;
-import org.xbmc.kore.utils.LogUtils;
 
+import org.xbmc.kore.R;
+import org.xbmc.kore.Settings;
+import org.xbmc.kore.ShareOpenActivity;
+import org.xbmc.kore.jsonrpc.ApiCallback;
+import org.xbmc.kore.jsonrpc.method.Application;
+import org.xbmc.kore.jsonrpc.type.ApplicationType;
+import org.xbmc.kore.provider.MediaContract;
+import org.xbmc.kore.utils.LogUtils;
+import org.xbmc.kore.utils.NetUtils;
+
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.Cache;
+import okhttp3.OkHttpClient;
 
 /**
  * Manages XBMC Hosts
@@ -43,12 +64,12 @@ public class HostManager {
 	// Singleton instance
 	private static volatile HostManager instance = null;
 
-	private Context context;
+	private final Context context;
 
 	/**
 	 * Arraylist that will hold all the hosts in the database
 	 */
-	private ArrayList<HostInfo> hosts = new ArrayList<HostInfo>();
+	private ArrayList<HostInfo> hosts = new ArrayList<>();
 
 	/**
 	 * Current host
@@ -82,7 +103,7 @@ public class HostManager {
 	 * @param context Android app context
 	 * @return HostManager singleton
 	 */
-	public static HostManager getInstance(Context context) {
+	public static HostManager getInstance(@NonNull Context context) {
 		if (instance == null) {
             synchronized (HostManager.class) {
                 if (instance == null) {
@@ -107,13 +128,14 @@ public class HostManager {
      * @return Host list
      */
 	public ArrayList<HostInfo> getHosts(boolean forcedReload) {
-        if (forcedReload || (hosts.size() == 0)) {
+        if (forcedReload || (hosts.isEmpty())) {
             hosts.clear();
 
             Cursor cursor = context.getContentResolver()
                                    .query(MediaContract.Hosts.CONTENT_URI,
                                            MediaContract.Hosts.ALL_COLUMNS,
                                            null, null, null);
+            if (cursor == null) return hosts;
 
             if (cursor.getCount() > 0) {
                 while (cursor.moveToNext()) {
@@ -129,14 +151,26 @@ public class HostManager {
                     String password = cursor.getString(idx++);
                     String macAddress = cursor.getString(idx++);
                     int wolPort = cursor.getInt(idx++);
+                    boolean directShare = (cursor.getInt(idx++) != 0);
+                    boolean useEventServer = (cursor.getInt(idx++) != 0);
+                    int eventServerPort = cursor.getInt(idx++);
 
-                    hosts.add(new HostInfo(id, name, address, protocol, httpPort, tcpPort,
-                            username, password, macAddress, wolPort));
+                    int kodiVersionMajor = cursor.getInt(idx++);
+                    int kodiVersionMinor = cursor.getInt(idx++);
+                    String kodiVersionRevision = cursor.getString(idx++);
+                    String kodiVersionTag = cursor.getString(idx++);
+                    boolean isHttps = (cursor.getInt(idx++) != 0);
+
+                    hosts.add(new HostInfo(
+                            id, name, address, protocol, httpPort, tcpPort,
+                            username, password, macAddress, wolPort, directShare, useEventServer, eventServerPort,
+                            kodiVersionMajor, kodiVersionMinor, kodiVersionRevision, kodiVersionTag,
+                            updated, isHttps));
                 }
             }
             cursor.close();
         }
-		return hosts;
+        return hosts;
 	}
 
 	/**
@@ -152,12 +186,12 @@ public class HostManager {
 
             // No host selected. Check if there are hosts configured and default to the first one
             if (currentHostId == -1) {
-                if (hosts.size() > 0) {
+                if (!hosts.isEmpty()) {
                     currentHostInfo = hosts.get(0);
                     currentHostId = currentHostInfo.getId();
                     prefs.edit()
-                            .putInt(Settings.KEY_PREF_CURRENT_HOST_ID, currentHostId)
-                            .apply();
+                         .putInt(Settings.KEY_PREF_CURRENT_HOST_ID, currentHostId)
+                         .apply();
                 }
             } else {
                 for (HostInfo host : hosts) {
@@ -177,10 +211,14 @@ public class HostManager {
 	 */
 	public HostConnection getConnection() {
         if (currentHostConnection == null) {
-            currentHostInfo = getHostInfo();
+            synchronized (this) {
+                if (currentHostConnection == null) {
+                    currentHostInfo = getHostInfo();
 
-            if (currentHostInfo != null) {
-                currentHostConnection = new HostConnection(currentHostInfo);
+                    if (currentHostInfo != null) {
+                        currentHostConnection = new HostConnection(currentHostInfo);
+                    }
+                }
             }
         }
 		return currentHostConnection;
@@ -194,9 +232,24 @@ public class HostManager {
         if (currentPicasso == null) {
             currentHostInfo = getHostInfo();
             if (currentHostInfo != null) {
+//                currentPicasso = new Picasso.Builder(context)
+//                        .downloader(new BasicAuthUrlConnectionDownloader(context,
+//                                currentHostInfo.getUsername(), currentHostInfo.getPassword()))
+//                        .indicatorsEnabled(BuildConfig.DEBUG)
+//                        .build();
+
+                // Create the okHttpCliente, with default timeout, authentication and cache
+                File cacheDir = NetUtils.createDefaultCacheDir(context);
+                long cacheSize = NetUtils.calculateDiskCacheSize(cacheDir);
+                OkHttpClient picassoClient = new OkHttpClient.Builder()
+                        .connectTimeout(getConnection().getConnectTimeout(), TimeUnit.MILLISECONDS)
+                        .authenticator(getConnection().getOkHttpAuthenticator())
+                        .cache(new Cache(cacheDir, cacheSize))
+                        .build();
+
                 currentPicasso = new Picasso.Builder(context)
-                        .downloader(new BasicAuthPicassoDownloader(context,
-                                currentHostInfo.getUsername(), currentHostInfo.getPassword()))
+                        .downloader(new OkHttp3Downloader(picassoClient))
+//                        .indicatorsEnabled(BuildConfig.DEBUG)
                         .build();
             }
         }
@@ -231,30 +284,39 @@ public class HostManager {
                     .edit()
                     .putInt(Settings.KEY_PREF_CURRENT_HOST_ID, currentHostInfo.getId())
                     .apply();
+
+            // Switched host, update dynamic shortcuts to only include the others
+            updateDynamicShortcuts();
         }
 	}
 
-//	/**
-//	 * Sets the current host.
-//	 * Throws {@link java.lang.IllegalArgumentException} if the host doesn't exist
-//	 * @param hostId Host id
-//	 */
-//	public void switchHost(int hostId) {
-//		ArrayList<HostInfo> hosts = getHosts();
-//		HostInfo newHostInfo = null;
-//
-//		for (HostInfo host : hosts) {
-//			if (host.getId() == hostId) {
-//				newHostInfo = host;
-//				break;
-//			}
-//		}
-//
-//		if (newHostInfo == null) {
-//			throw new IllegalArgumentException("Host doesn't exist!");
-//		}
-//		switchHost(newHostInfo);
-//	}
+    /**
+     * Add all kodi hosts, except the current one, to the dynamic shortcuts list
+     * The current one is always accessible via the default intent filters
+     */
+    private void updateDynamicShortcuts() {
+        ShortcutManagerCompat.removeAllDynamicShortcuts(context);
+
+        ArrayList<HostInfo> hosts = getHosts();
+		for (HostInfo host : hosts) {
+            if (host.getId() != currentHostInfo.getId() &&
+                host.getShowAsDirectShareTarget()) {
+                String id = Integer.toString(host.getId());
+                Intent defaultOpenIntent = new Intent(ShareOpenActivity.DEFAULT_OPEN_ACTION)
+                        .setClass(context, ShareOpenActivity.class)
+                        .addCategory(ShareOpenActivity.SHARE_TARGET_CATEGORY)
+                        .putExtra(ShortcutManagerCompat.EXTRA_SHORTCUT_ID, id);
+                ShortcutInfoCompat shortcut = new ShortcutInfoCompat.Builder(context, id)
+                        .setShortLabel(host.getName())
+                        .setLongLabel(host.getName())
+                        .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+                        .setCategories(Collections.singleton(ShareOpenActivity.SHARE_TARGET_CATEGORY))
+                        .setIntent(defaultOpenIntent)
+                        .build();
+                ShortcutManagerCompat.pushDynamicShortcut(context, shortcut);
+            }
+        }
+    }
 
     /**
      * Adds a new XBMC host to the database
@@ -263,11 +325,14 @@ public class HostManager {
      */
     public HostInfo addHost(HostInfo hostInfo) {
         return addHost(hostInfo.getName(), hostInfo.getAddress(), hostInfo.getProtocol(),
-                hostInfo.getHttpPort(), hostInfo.getTcpPort(),
-                hostInfo.getUsername(), hostInfo.getPassword(),
-                hostInfo.getMacAddress(), hostInfo.getWolPort());
+                       hostInfo.getHttpPort(), hostInfo.getTcpPort(),
+                       hostInfo.getUsername(), hostInfo.getPassword(),
+                       hostInfo.getMacAddress(), hostInfo.getWolPort(),
+                       hostInfo.getShowAsDirectShareTarget(), hostInfo.getUseEventServer(),
+                       hostInfo.getEventServerPort(), hostInfo.getKodiVersionMajor(),
+                       hostInfo.getKodiVersionMinor(), hostInfo.getKodiVersionRevision(),
+                       hostInfo.getKodiVersionTag(), hostInfo.isHttps);
     }
-
 
     /**
 	 * Adds a new XBMC host to the database
@@ -281,7 +346,10 @@ public class HostManager {
 	 * @return Newly created {@link org.xbmc.kore.host.HostInfo}
 	 */
 	public HostInfo addHost(String name, String address, int protocol, int httpPort, int tcpPort,
-						   String username, String password, String macAddress, int wolPort) {
+						   String username, String password, String macAddress, int wolPort, boolean directShare,
+                            boolean useEventServer, int eventServerPort,
+                            int kodiVersionMajor, int kodiVersionMinor, String kodiVersionRevision, String kodiVersionTag,
+                            boolean isHttps) {
 
 		ContentValues values = new ContentValues();
 		values.put(MediaContract.HostsColumns.NAME, name);
@@ -293,10 +361,18 @@ public class HostManager {
 		values.put(MediaContract.HostsColumns.PASSWORD, password);
         values.put(MediaContract.HostsColumns.MAC_ADDRESS, macAddress);
         values.put(MediaContract.HostsColumns.WOL_PORT, wolPort);
+        values.put(MediaContract.HostsColumns.DIRECT_SHARE, directShare);
+        values.put(MediaContract.HostsColumns.USE_EVENT_SERVER, useEventServer);
+        values.put(MediaContract.HostsColumns.EVENT_SERVER_PORT, eventServerPort);
+        values.put(MediaContract.HostsColumns.KODI_VERSION_MAJOR, kodiVersionMajor);
+        values.put(MediaContract.HostsColumns.KODI_VERSION_MINOR, kodiVersionMinor);
+        values.put(MediaContract.HostsColumns.KODI_VERSION_REVISION, kodiVersionRevision);
+        values.put(MediaContract.HostsColumns.KODI_VERSION_TAG, kodiVersionTag);
+        values.put(MediaContract.HostsColumns.IS_HTTPS, isHttps);
 
         Uri newUri = context.getContentResolver()
                             .insert(MediaContract.Hosts.CONTENT_URI, values);
-        long newId = Long.valueOf(MediaContract.Hosts.getHostId(newUri));
+        long newId = Long.parseLong(MediaContract.Hosts.getHostId(newUri));
 
 		// Refresh the list and return the created host
 		hosts = getHosts(true);
@@ -327,6 +403,14 @@ public class HostManager {
         values.put(MediaContract.HostsColumns.PASSWORD, newHostInfo.getPassword());
         values.put(MediaContract.HostsColumns.MAC_ADDRESS, newHostInfo.getMacAddress());
         values.put(MediaContract.HostsColumns.WOL_PORT, newHostInfo.getWolPort());
+        values.put(MediaContract.HostsColumns.DIRECT_SHARE, newHostInfo.getShowAsDirectShareTarget());
+        values.put(MediaContract.HostsColumns.USE_EVENT_SERVER, newHostInfo.getUseEventServer());
+        values.put(MediaContract.HostsColumns.EVENT_SERVER_PORT, newHostInfo.getEventServerPort());
+        values.put(MediaContract.HostsColumns.KODI_VERSION_MAJOR, newHostInfo.getKodiVersionMajor());
+        values.put(MediaContract.HostsColumns.KODI_VERSION_MINOR, newHostInfo.getKodiVersionMinor());
+        values.put(MediaContract.HostsColumns.KODI_VERSION_REVISION, newHostInfo.getKodiVersionRevision());
+        values.put(MediaContract.HostsColumns.KODI_VERSION_TAG, newHostInfo.getKodiVersionTag());
+        values.put(MediaContract.HostsColumns.IS_HTTPS, newHostInfo.isHttps);
 
         context.getContentResolver()
                .update(MediaContract.Hosts.buildHostUri(hostId), values, null, null);
@@ -351,13 +435,8 @@ public class HostManager {
      */
 	public void deleteHost(final int hostId) {
         // Async call delete. The triggers to delete all host information can take some time
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                context.getContentResolver()
-                       .delete(MediaContract.Hosts.buildHostUri(hostId), null, null);
-            }
-        }).start();
+        new Thread(() -> context.getContentResolver()
+                        .delete(MediaContract.Hosts.buildHostUri(hostId), null, null)).start();
 
         // Refresh information
         int index = -1;
@@ -372,7 +451,7 @@ public class HostManager {
         // If we just deleted the current connection, switch to another
         if ((currentHostInfo != null) && (currentHostInfo.getId() == hostId)) {
             releaseCurrentHost();
-            if (hosts.size() > 0)
+            if (!hosts.isEmpty())
                 switchHost(hosts.get(0));
         }
 	}
@@ -398,6 +477,48 @@ public class HostManager {
             // So, for now, just let it be...
 //            currentPicasso.shutdown();
             currentPicasso = null;
+        }
+    }
+
+    // Check Kodi's version every 2 hours
+    private final static long KODI_VERSION_CHECK_INTERVAL_MILLIS = 2 * DateUtils.HOUR_IN_MILLIS;
+
+    /**
+     * Periodic checks Kodi's version and updates the DB to reflect that.
+     * This should be called somewhere that gets executed periodically
+     *
+     */
+    public void checkAndUpdateKodiVersion() {
+        if (currentHostInfo == null) {
+            currentHostInfo = getHostInfo();
+            if (currentHostInfo == null) return;
+        }
+
+        if (currentHostInfo.getUpdated() + KODI_VERSION_CHECK_INTERVAL_MILLIS < java.lang.System.currentTimeMillis()) {
+            LogUtils.LOGD(TAG, "Checking Kodi version...");
+            final int checkHostId = currentHostInfo.getId();
+            final Application.GetProperties getProperties = new Application.GetProperties(Application.GetProperties.VERSION);
+            getProperties.execute(getConnection(), new ApiCallback<ApplicationType.PropertyValue>() {
+                @Override
+                public void onSuccess(ApplicationType.PropertyValue result) {
+                    // Simple check to see if we didn't switched host in the meantime.
+                    // Given that this and all calls to switchHost are run on the UI thread, there's no need for more
+                    if (checkHostId != currentHostInfo.getId()) return;
+                    LogUtils.LOGD(TAG, "Successfully checked Kodi version.");
+                    currentHostInfo.setKodiVersionMajor(result.version.major);
+                    currentHostInfo.setKodiVersionMinor(result.version.minor);
+                    currentHostInfo.setKodiVersionRevision(result.version.revision);
+                    currentHostInfo.setKodiVersionTag(result.version.tag);
+
+                    currentHostInfo = editHost(currentHostInfo.getId(), currentHostInfo);
+                }
+
+                @Override
+                public void onError(int errorCode, String description) {
+                    // Couldn't get Kodi version... Ignore
+                    LogUtils.LOGD(TAG, "Couldn't get Kodi version. Error: " + description);
+                }
+            }, new Handler(Looper.getMainLooper()));
         }
     }
 }

@@ -43,14 +43,30 @@ public class GlobalType {
             minutes = JsonUtils.intFromJsonNode(node, MINUTES, 0);
             seconds = JsonUtils.intFromJsonNode(node, SECONDS, 0);
         }
+
+        /**
+         * Returns the seconds from midnight that this time object represents
+         * @return Seconds from midnight
+         */
+        public int toSeconds() {
+            return hours * 3600 + minutes * 60 + seconds;
+        }
+
+        /**
+         * Returns miliseconds from midnight that this time object represents
+         * @return Miliseconds from midnight
+         */
+        public long toMiliseconds() {
+            return toSeconds() * 1000L;
+        }
     }
 
     /**
      * Global.IncrementDecrement
      */
     public interface IncrementDecrement {
-        public final String INCREMENT = "increment";
-        public final String DECREMENT = "decrement";
+        String INCREMENT = "increment";
+        String DECREMENT = "decrement";
     }
 
 }

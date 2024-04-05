@@ -27,6 +27,8 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.text.TextUtils;
 
+import androidx.annotation.NonNull;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,10 +44,10 @@ public class SelectionBuilder {
     private static final String TAG = LogUtils.makeLogTag(SelectionBuilder.class);
 
     private String mTable = null;
-    private Map<String, String> mProjectionMap = new HashMap<String, String>();
-    private StringBuilder mSelection = new StringBuilder();
-    private ArrayList<String> mSelectionArgs = new ArrayList<String>();
-
+    private final Map<String, String> mProjectionMap = new HashMap<>();
+    private final StringBuilder mSelection = new StringBuilder();
+    private final ArrayList<String> mSelectionArgs = new ArrayList<>();
+    private final StringBuilder mGroupBy = new StringBuilder();
     /**
      * Reset any internal state, allowing this builder to be recycled.
      */
@@ -53,6 +55,20 @@ public class SelectionBuilder {
         mTable = null;
         mSelection.setLength(0);
         mSelectionArgs.clear();
+        return this;
+    }
+
+    public SelectionBuilder groupBy(String... groupByArgs) {
+        if (groupByArgs != null) {
+            if (mGroupBy.length() > 0)
+                mGroupBy.append(", ");
+
+            int size = groupByArgs.length - 1;
+            for (int i = 0; i < size; i++) {
+                mGroupBy.append(groupByArgs[i]).append(", ");
+            }
+            mGroupBy.append(groupByArgs[size]);
+        }
         return this;
     }
 
@@ -131,6 +147,7 @@ public class SelectionBuilder {
         }
     }
 
+    @NonNull
     @Override
     public String toString() {
         return "SelectionBuilder[table=" + mTable + ", selection=" + getSelection()
@@ -141,7 +158,14 @@ public class SelectionBuilder {
      * Execute query using the current internal state as {@code WHERE} clause.
      */
     public Cursor query(SQLiteDatabase db, String[] columns, String orderBy) {
-        return query(db, columns, null, null, orderBy, null);
+        return query(db, columns, mGroupBy.toString(), null, orderBy, null);
+    }
+
+    /**
+     * Execute query using the current internal state as {@code WHERE} clause.
+     */
+    public Cursor query(SQLiteDatabase db, String[] columns, String orderBy, String limit) {
+        return query(db, columns, mGroupBy.toString(), null, orderBy, limit);
     }
 
     /**

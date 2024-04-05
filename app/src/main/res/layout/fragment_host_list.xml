@@ -15,8 +15,9 @@
    limitations under the License.
 -->
 
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/coordinator"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -31,32 +32,26 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            style="@style/WizardTitle"
+            style="@style/Widget.Kore.TextView.WizardTitle"
             android:gravity="center"
             android:text="@string/no_xbmc_configured" />
-        <View
-            style="@style/DefaultDividerH"/>
 
-        <Button
-            android:id="@+id/action_add_host"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            style="@style/Widget.Button.Borderless"
-            android:text="@string/add_xbmc"/>
     </LinearLayout>
 
     <GridView
         android:id="@+id/list"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingLeft="@dimen/small_padding"
-        android:paddingRight="@dimen/small_padding"
-        android:paddingTop="@dimen/small_padding"
-        android:paddingBottom="@dimen/default_padding"
-        android:clipToPadding="false"
-        android:listSelector="?attr/selectableItemBackground"
-        android:drawSelectorOnTop="true"
-        android:choiceMode="singleChoice"
-        style="@style/Widget.GridView"/>
+        android:layout_height="match_parent"
+        style="@style/Widget.Kore.Grid.Host"/>
 
-</FrameLayout>
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fab_add_host"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/default_padding"
+        android:layout_gravity="bottom|end"
+        android:contentDescription="@string/add_xbmc"
+        android:text="@string/add_xbmc"
+        app:icon="@drawable/ic_round_add_24"/>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

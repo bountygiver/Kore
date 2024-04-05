@@ -30,16 +30,7 @@ public class CharacterDrawable extends ColorDrawable {
 //    private static final int STROKE_WIDTH = 10;
 //    private static final float SHADE_FACTOR = 0.9f;
 
-    private static final Typeface typeface;
-    static {
-        if (Utils.isJellybeanMR1OrLater()) {
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL);
-        } else if (Utils.isJellybeanOrLater()) {
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL);
-        } else {
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL);
-        }
-    }
+    private static final Typeface typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL);
 
     public CharacterDrawable(char character, int color) {
         super(color);
@@ -76,10 +67,10 @@ public class CharacterDrawable extends ColorDrawable {
 //        canvas.drawRect(getBounds(), borderPaint);
 
         // draw text
-        int width = canvas.getWidth();
-        int height = canvas.getHeight();
-        textPaint.setTextSize(height / 2);
-        canvas.drawText(String.valueOf(character), width/2, height/2 - ((textPaint.descent() + textPaint.ascent()) / 2) , textPaint);
+        int width = getBounds().width();
+        int height = getBounds().height();
+        textPaint.setTextSize(height / 2.0f);
+        canvas.drawText(String.valueOf(character), width/2.0f, height/2.0f - ((textPaint.descent() + textPaint.ascent()) / 2) , textPaint);
     }
 
     @Override

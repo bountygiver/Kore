@@ -15,11 +15,14 @@
  */
 package org.xbmc.kore.host;
 
-import org.xbmc.kore.jsonrpc.HostConnection;
 import org.xbmc.kore.utils.LogUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * XBMC Host information container.
@@ -28,6 +31,11 @@ public class HostInfo {
 	private static final String TAG = LogUtils.makeLogTag(HostInfo.class);
 
 	private static final String JSON_RPC_ENDPOINT = "/jsonrpc";
+
+	/**
+	 * Default HTTPS port
+	 */
+	public static final int DEFAULT_HTTPS_PORT = 443;
 
 	/**
 	 * Default HTTP port for XBMC (80 on Windows, 8080 on others)
@@ -44,28 +52,65 @@ public class HostInfo {
      */
     public static final int DEFAULT_WOL_PORT = 9;
 
+	/**
+	 * Default EventServer port for Kodi
+	 */
+	public static final int DEFAULT_EVENT_SERVER_PORT = 9777;
+
+	public static final int KODI_V12_FRODO = 12;
+	public static final int KODI_V13_GOTHAM = 13;
+	public static final int KODI_V14_HELIX = 14;
+	public static final int KODI_V15_ISENGARD = 15;
+	public static final int KODI_V16_JARVIS = 16;
+	public static final int KODI_V17_KRYPTON = 17;
+	public static final int KODI_V18_LEIA = 18;
+	public static final int KODI_V19_MATRIX = 19;
+	public static final int KODI_V20_NEXUS = 20;
+
+	public static final int DEFAULT_KODI_VERSION_MAJOR = KODI_V16_JARVIS;
+    public static final int DEFAULT_KODI_VERSION_MINOR = 1;
+    public static final String DEFAULT_KODI_VERSION_REVISION = "Unknown";
+    public static final String DEFAULT_KODI_VERSION_TAG = "stable";
+
+	public static Map<Integer, String> versionNames = new HashMap<>();
+	static {
+		versionNames.put(KODI_V12_FRODO, "Frodo");
+		versionNames.put(KODI_V13_GOTHAM, "Gotham");
+		versionNames.put(KODI_V14_HELIX, "Helix");
+		versionNames.put(KODI_V15_ISENGARD, "Isengard");
+		versionNames.put(KODI_V16_JARVIS, "Jarvis");
+		versionNames.put(KODI_V17_KRYPTON, "Kripton");
+		versionNames.put(KODI_V18_LEIA, "Leia");
+		versionNames.put(KODI_V19_MATRIX, "Matrix");
+		versionNames.put(KODI_V20_NEXUS, "Nexus");
+	}
+
     /**
 	 * Internal id of the host
 	 */
-	private int id;
+	private final int id;
 
 	/**
 	 * Friendly name of the host
 	 */
-	private String name;
+	private final String name;
 
 	/**
 	 * Connection information
 	 */
-	private String address;
-	private int httpPort;
-	private int tcpPort;
+	private final String address;
+	private final int httpPort;
+	private final int tcpPort;
+	public final boolean isHttps;
+
+    private boolean useEventServer;
+	private final int eventServerPort;
 
     /**
 	 * Authentication information
 	 */
-	private String username;
-	private String password;
+	private final String username;
+	private final String password;
 
     /**
      * Mac address and Wake On Lan port
@@ -74,11 +119,30 @@ public class HostInfo {
     private int wolPort;
 
 	/**
+	 * Direct share target
+	 */
+	private boolean showAsDirectShareTarget;
+
+	/**
 	 * Prefered protocol to communicate with this host
 	 */
 	private int protocol;
 
-    private String auxImageHttpAddress;
+
+    /**
+     * Kodi Version
+     */
+    private int kodiVersionMajor;
+    private int kodiVersionMinor;
+    private String kodiVersionRevision;
+    private String kodiVersionTag;
+
+    /**
+     * Last time updated (in millis)
+     */
+    private final long updated;
+
+    private final String auxImageHttpAddress;
 
     /**
 	 * Full constructor. This constructor should be used when instantiating from the database
@@ -93,7 +157,10 @@ public class HostInfo {
 	 * @param password Password for basic auth
 	 */
 	public HostInfo(int id, String name, String address, int protocol, int httpPort, int tcpPort,
-					String username, String password, String macAddress, int wolPort) {
+					String username, String password, String macAddress, int wolPort, boolean showAsDirectShareTarget,
+                    boolean useEventServer, int eventServerPort,
+                    int kodiVersionMajor, int kodiVersionMinor, String kodiVersionRevision, String kodiVersionTag,
+                    long updated, boolean isHttps) {
 		this.id = id;
 		this.name = name;
 		this.address = address;
@@ -102,11 +169,22 @@ public class HostInfo {
         }
 		this.protocol = protocol;
 		this.httpPort = httpPort;
+		this.isHttps = isHttps;
 		this.tcpPort = tcpPort;
 		this.username = username;
 		this.password = password;
         this.macAddress = macAddress;
         this.wolPort = wolPort;
+        this.showAsDirectShareTarget = showAsDirectShareTarget;
+
+        this.useEventServer = useEventServer;
+		this.eventServerPort = eventServerPort;
+
+        this.kodiVersionMajor = kodiVersionMajor;
+        this.kodiVersionMinor = kodiVersionMinor;
+        this.kodiVersionRevision = kodiVersionRevision;
+        this.kodiVersionTag = kodiVersionTag;
+        this.updated = updated;
 
         // For performance reasons
         this.auxImageHttpAddress = getHttpURL() + "/image/";
@@ -114,7 +192,7 @@ public class HostInfo {
 
 	/**
 	 * Auxiliary constructor for HTTP protocol.
-	 * This constructoor should only be used to test connections. It doesn't represent an
+	 * This constructor should only be used to test connections. It doesn't represent an
 	 * instance of the host in the database.
 	 *
 	 * @param name Friendly name of the host
@@ -123,12 +201,18 @@ public class HostInfo {
 	 * @param username Username for basic auth
 	 * @param password Password for basic auth
 	 */
-	public HostInfo(String name, String address, int httpPort, int tcpPort, String username, String password) {
-		this(-1, name, address, HostConnection.PROTOCOL_TCP, httpPort, tcpPort, username,
-                password, null, DEFAULT_WOL_PORT);
+	public HostInfo(String name, String address, int protocol, int httpPort,
+                    int tcpPort, String username, String password,
+                    boolean useEventServer, int eventServerPort, boolean isHttps,
+					boolean showAsDirectShareTarget) {
+        this(-1, name, address, protocol, httpPort, tcpPort, username,
+             password, null, DEFAULT_WOL_PORT, showAsDirectShareTarget, useEventServer,
+			 eventServerPort, DEFAULT_KODI_VERSION_MAJOR, DEFAULT_KODI_VERSION_MINOR,
+             DEFAULT_KODI_VERSION_REVISION, DEFAULT_KODI_VERSION_TAG,
+             0, isHttps);
 	}
 
-	public int getId() {
+    public int getId() {
 		return id;
 	}
 
@@ -172,9 +256,53 @@ public class HostInfo {
         this.wolPort = wolPort;
     }
 
+    public boolean getShowAsDirectShareTarget() {
+		return showAsDirectShareTarget;
+	}
+
+	public void setShowAsDirectShareTarget(boolean showAsDirectShareTarget) {
+		this.showAsDirectShareTarget = showAsDirectShareTarget;
+	}
+
     public int getProtocol() {
 		return protocol;
 	}
+
+    public boolean getUseEventServer() {
+        return useEventServer;
+    }
+
+	public int getEventServerPort() {
+		return eventServerPort;
+	}
+
+    public int getKodiVersionMajor() {
+        return kodiVersionMajor;
+    }
+
+    public int getKodiVersionMinor() {
+        return kodiVersionMinor;
+    }
+
+    public String getKodiVersionRevision() {
+        return kodiVersionRevision;
+    }
+
+    public String getKodiVersionTag() {
+        return kodiVersionTag;
+    }
+
+	public String getKodiVersionDesc() {
+		if (versionNames.containsKey(kodiVersionMajor)) {
+			return String.format(Locale.getDefault(), "%s (%d.%d)", versionNames.get(kodiVersionMajor), kodiVersionMajor, kodiVersionMinor);
+		} else {
+			return String.format(Locale.getDefault(), "%d.%d", kodiVersionMajor, kodiVersionMinor);
+		}
+	}
+
+    public long getUpdated() {
+        return updated;
+    }
 
     /**
      * Overrides the protocol for this host info
@@ -188,11 +316,48 @@ public class HostInfo {
     }
 
     /**
+     * Overrides the use of EventServer
+     * @param useEventServer Whether to use EventServer
+     */
+    public void setUseEventServer(boolean useEventServer) {
+        this.useEventServer = useEventServer;
+    }
+
+    public void setKodiVersionMajor(int kodiVersionMajor) {
+        this.kodiVersionMajor = kodiVersionMajor;
+    }
+
+    public void setKodiVersionMinor(int kodiVersionMinor) {
+        this.kodiVersionMinor = kodiVersionMinor;
+    }
+
+    public void setKodiVersionRevision(String kodiVersionRevision) {
+        this.kodiVersionRevision = kodiVersionRevision;
+    }
+
+    public void setKodiVersionTag(String kodiVersionTag) {
+        this.kodiVersionTag = kodiVersionTag;
+    }
+
+    public boolean isGothamOrLater() {
+        return kodiVersionMajor >= KODI_V13_GOTHAM;
+    }
+
+    public boolean isKryptonOrLater() {
+        return kodiVersionMajor >= KODI_V17_KRYPTON;
+    }
+
+	public boolean isLeiaOrLater() {
+		return kodiVersionMajor >= KODI_V18_LEIA;
+	}
+
+	/**
 	 * Returns the URL of the host
 	 * @return HTTP URL eg. http://192.168.1.1:8080
 	 */
 	public String getHttpURL() {
-		return "http://" + address + ":" + httpPort;
+		String scheme = isHttps ? "https://" : "http://";
+		return scheme + address + ":" + httpPort;
 	}
 
 	/**
@@ -200,7 +365,7 @@ public class HostInfo {
 	 * @return HTTP URL eg. http://192.168.1.1:8080/jsonrpc
 	 */
 	public String getJsonRpcHttpEndpoint() {
-		return "http://" + address + ":" + httpPort + JSON_RPC_ENDPOINT;
+		return getHttpURL() + JSON_RPC_ENDPOINT;
 	}
 
     /**
@@ -215,7 +380,7 @@ public class HostInfo {
 
         try {
 //            return getHttpURL() + "/image/" + URLEncoder.encode(image, "UTF-8");
-            return auxImageHttpAddress + URLEncoder.encode(image, "UTF-8");
+            return auxImageHttpAddress + URLEncoder.encode(image, StandardCharsets.UTF_8.name());
         } catch (UnsupportedEncodingException e) {
             // Ignore for now...
             return null;

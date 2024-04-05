@@ -15,10 +15,8 @@
 # Picasso
 -dontwarn com.squareup.okhttp.**
 
-# Butterknife
--dontwarn butterknife.internal.**
--keep class **$$ViewInjector { *; }
--keepnames class * { @butterknife.InjectView *;}
+# okio via OkHttp
+-dontwarn okio.**
 
 # Jackson
 -dontskipnonpubliclibraryclassmembers
@@ -33,7 +31,10 @@
 }
 
 # SearchView
--keep class android.support.v7.widget.SearchView { *; }
+-keep class androidx.appcompat.widget.SearchView { *; }
+
+#JmDNS
+-dontwarn org.slf4j.*
 
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface

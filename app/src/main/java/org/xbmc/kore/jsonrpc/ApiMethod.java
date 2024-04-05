@@ -18,11 +18,12 @@ package org.xbmc.kore.jsonrpc;
 
 import android.os.Handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import org.xbmc.kore.host.HostConnection;
 import org.xbmc.kore.jsonrpc.type.ApiParameter;
 import org.xbmc.kore.utils.LogUtils;
 
@@ -64,15 +65,27 @@ public abstract class ApiMethod<T> {
 	 * Constructor, sets up the necessary items to make the call later
 	 */
 	public ApiMethod() {
-        synchronized (this) {
-            this.id = (++lastId % 10000);
-        }
+		this(true);
+	}
 
+	/**
+	 * Constructor, sets up the necessary items to make the call later
+	 */
+	public ApiMethod(boolean sendId) {
 		// Create the rpc request object with the common fields according to JSON RPC spec
 		jsonRequest = objectMapper.createObjectNode();
 		jsonRequest.put("jsonrpc", "2.0");
 		jsonRequest.put(METHOD_NODE, getMethodName());
-		jsonRequest.put(ID_NODE, id);
+
+		if(sendId) {
+			synchronized (this) {
+				this.id = (++lastId % 10000);
+			}
+			jsonRequest.put(ID_NODE, id);
+		}
+		else {
+			id = -1;
+		}
 	}
 
     /**
@@ -86,7 +99,7 @@ public abstract class ApiMethod<T> {
             params = (ObjectNode)jsonRequest.get(PARAMS_NODE);
         } else {
             params = objectMapper.createObjectNode();
-            jsonRequest.put(PARAMS_NODE, params);
+            jsonRequest.set(PARAMS_NODE, params);
         }
 
         return params;
@@ -110,7 +123,6 @@ public abstract class ApiMethod<T> {
         if (value != null)
             getParametersNode().put(parameter, value);
     }
-
 
     /**
      * Adds a parameter to the request
@@ -149,10 +161,10 @@ public abstract class ApiMethod<T> {
     protected void addParameterToRequest(String parameter, String[] values) {
         if (values != null) {
             final ArrayNode arrayNode = objectMapper.createArrayNode();
-            for (int i = 0; i < values.length; i++) {
-                arrayNode.add(values[i]);
-            }
-            getParametersNode().put(parameter, arrayNode);
+			for (String value : values) {
+				arrayNode.add(value);
+			}
+            getParametersNode().set(parameter, arrayNode);
         }
     }
 
@@ -163,7 +175,7 @@ public abstract class ApiMethod<T> {
      */
     protected void addParameterToRequest(String parameter, ApiParameter value) {
         if (value != null)
-            getParametersNode().put(parameter, value.toJsonNode());
+            getParametersNode().set(parameter, value.toJsonNode());
     }
 
     /**
@@ -173,7 +185,7 @@ public abstract class ApiMethod<T> {
      */
     protected void addParameterToRequest(String parameter, JsonNode value) {
         if (value != null)
-            getParametersNode().put(parameter, value);
+            getParametersNode().set(parameter, value);
     }
 
     /**
@@ -197,24 +209,9 @@ public abstract class ApiMethod<T> {
 	 */
 	public ObjectNode toJsonObject() { return jsonRequest; }
 
-//	/**
-//	 * Calls the method represented by this object on the server.
-//	 * This call is always asynchronous. The results will be posted, through the callback parameter,
-//	 * on the same thread that is calling this method.
-//	 * Note: The current thread must have a Looper prepared, otherwise this will fail because we
-//	 * try to get handler on the thread.
-//	 *
-//	 * @param hostConnection Host connection on which to call the method
-//	 * @param callback Callbacks to post the response to
-//	 */
-//	public void execute(HostConnection hostConnection, ApiCallback<T> callback) {
-//		execute(hostConnection, callback, new Handler(Looper.myLooper()));
-//	}
-
 	/**
-	 * Calls the method represented by this object on the server.
-	 * This call is always asynchronous. The results will be posted, through the callback parameter,
-	 * on the specified handler.
+	 * Calls the method represented by this object on the server asynchronously.
+	 * The results will be posted through the callback function on the specified handler.
 	 *
 	 * @param hostConnection Host connection on which to call the method
 	 * @param callback Callbacks to post the response to
@@ -223,7 +220,7 @@ public abstract class ApiMethod<T> {
 	public void execute(HostConnection hostConnection, ApiCallback<T> callback, Handler handler) {
         if (hostConnection != null) {
             hostConnection.execute(this, callback, handler);
-        } else {
+        } else if (callback != null) {
             callback.onError(ApiException.API_NO_CONNECTION, "No connection specified.");
         }
 	}
@@ -245,8 +242,6 @@ public abstract class ApiMethod<T> {
 	public T resultFromJson(String jsonResult) throws ApiException{
 		try {
 			return resultFromJson((ObjectNode)objectMapper.readTree(jsonResult));
-		} catch (JsonProcessingException e) {
-			throw new ApiException(ApiException.INVALID_JSON_RESPONSE_FROM_HOST, e);
 		} catch (IOException e) {
 			throw new ApiException(ApiException.INVALID_JSON_RESPONSE_FROM_HOST, e);
 		}

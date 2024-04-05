@@ -60,12 +60,12 @@ public class Files {
      * Enums for File.Media
      */
     public interface Media {
-        public final static String VIDEO = "video";
-        public final static String MUSIC = "music";
-        public final static String PICTURES = "pictures";
-        public final static String FILES =  "files";
-        public final static String PROGRAMS =  "programs";
-        public final static String[] allValues = new String[] {
+        String VIDEO = "video";
+        String MUSIC = "music";
+        String PICTURES = "pictures";
+        String FILES =  "files";
+        String PROGRAMS =  "programs";
+        String[] allValues = new String[] {
                 VIDEO, MUSIC, PICTURES, FILES, PROGRAMS
         };
     }
@@ -96,9 +96,9 @@ public class Files {
             ArrayNode items = resultNode.has(SOURCE_NODE) ?
                     (ArrayNode) resultNode.get(SOURCE_NODE) : null;
             if (items == null) {
-                return new ArrayList<ItemType.Source>(0);
+                return new ArrayList<>(0);
             }
-            ArrayList<ItemType.Source> result = new ArrayList<ItemType.Source>(items.size());
+            ArrayList<ItemType.Source> result = new ArrayList<>(items.size());
 
             for (JsonNode item : items) {
                 result.add(new ItemType.Source(item));
@@ -116,14 +116,23 @@ public class Files {
         public final static String FILE_NODE = "files";
 
         /**
-         * Get the directory content
-         * @param path          full path name
-         * @param sort_params   sorting criteria
+         * Get the directories and files in the given directory
+         * @param directory Full path name
+         * @param media Type of media to retrieve.
+         *              See {@link Files.Media} for a list of accepted values
+         * @param sort_params Sorting criteria
+         * @param properties Properties to retrieve.
+         *                   See {@link org.xbmc.kore.jsonrpc.type.ListType.FieldsFiles}
+         *                   constants for a list of accepted values
          */
-        public GetDirectory(String path, ListType.Sort sort_params) {
+        public GetDirectory(String directory, String media, ListType.Sort sort_params, String... properties) {
             super();
-            addParameterToRequest("directory", path);
-            addParameterToRequest(SORT_NODE, sort_params.toJsonNode());
+            addParameterToRequest("directory", directory);
+            addParameterToRequest("media", media);
+            addParameterToRequest("properties", properties);
+            if (sort_params != null) {
+                addParameterToRequest(SORT_NODE, sort_params.toJsonNode());
+            }
         }
 
         @Override
@@ -131,15 +140,20 @@ public class Files {
 
         @Override
         public List<ListType.ItemFile> resultFromJson(ObjectNode jsonObject) throws ApiException {
-
-            JsonNode resultNode = jsonObject.get(RESULT_NODE);
-            ArrayNode items = resultNode.has(FILE_NODE) ?
-                    (ArrayNode) resultNode.get(FILE_NODE) : null;
-            if (items == null) {
-                return new ArrayList<ListType.ItemFile>(0);
+            JsonNode fileNode = jsonObject.get(RESULT_NODE)
+                    .get(FILE_NODE);
+            if (fileNode == null || fileNode.isNull()) {
+                return new ArrayList<>(0);
             }
-            ArrayList<ListType.ItemFile> result = new ArrayList<ListType.ItemFile>(items.size());
+            ArrayNode items = (ArrayNode) fileNode;
+            ArrayList<ListType.ItemFile> result = new ArrayList<>(items.size());
             for (JsonNode item : items) {
+                String regex = "\\[.*?\\]";
+                JsonNode label = item.get("label");
+                if (!label.isNull()) {
+                    String new_label = label.textValue().replaceAll(regex, "");
+                    ((ObjectNode) item).put("label", new_label);
+                }
                 result.add(new ListType.ItemFile(item));
             }
             return result;

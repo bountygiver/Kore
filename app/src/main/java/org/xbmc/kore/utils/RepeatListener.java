@@ -15,7 +15,9 @@
  */
 package org.xbmc.kore.utils;
 
+import android.content.Context;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.SoundEffectConstants;
 import android.view.View;
@@ -35,13 +37,13 @@ import android.widget.ImageButton;
 public class RepeatListener implements View.OnTouchListener {
     private static final String TAG = LogUtils.makeLogTag(RepeatListener.class);
 
-    private static Handler repeatHandler = new Handler();
+    private static final Handler repeatHandler = new Handler(Looper.getMainLooper());
 
-    private int initialInterval;
+    private final int initialInterval;
     private final int repeatInterval;
     private final View.OnClickListener clickListener;
 
-    private Runnable handlerRunnable = new Runnable() {
+    private final Runnable handlerRunnable = new Runnable() {
         @Override
         public void run() {
             if (downView.isShown()) {
@@ -56,10 +58,12 @@ public class RepeatListener implements View.OnTouchListener {
     /**
      * Animations for down/up
      */
-    private Animation animDown;
-    private Animation animUp;
+    private final Animation animDown;
+    private final Animation animUp;
 
     private View downView;
+
+    private final Context context;
 
     /**
      * Constructor for a repeat listener
@@ -69,26 +73,34 @@ public class RepeatListener implements View.OnTouchListener {
      * @param clickListener The OnClickListener, that will be called periodically
      */
     public RepeatListener(int initialInterval, int repeatInterval, View.OnClickListener clickListener) {
-        this(initialInterval, repeatInterval, clickListener, null, null);
+        this(initialInterval, repeatInterval, clickListener, null, null, null);
+    }
+
+    public RepeatListener(int initialInterval, int repeatInterval, View.OnClickListener clickListener,
+                          Animation animDown, Animation animUp) {
+        this(initialInterval, repeatInterval, clickListener, animUp, animDown, null);
     }
 
     /**
-     * Constructor for a repeat listener, with animation
+     * Constructor for a repeat listener, with animation and vibration
      *
      * @param initialInterval The interval after first click event. If negative, no repeat will occur
      * @param repeatInterval The interval after second and subsequent click events. If negative, no repeat will occur
      * @param clickListener The OnClickListener, that will be called periodically
      * @param animDown Animation to play on touch
      * @param animUp Animation to play on release
+     * @param context Context used to access preferences and services
      */
     public RepeatListener(int initialInterval, int repeatInterval, View.OnClickListener clickListener,
-                          Animation animDown, Animation animUp) {
+                          Animation animDown, Animation animUp, Context context) {
         this.initialInterval = initialInterval;
         this.repeatInterval = repeatInterval;
         this.clickListener = clickListener;
 
         this.animDown = animDown;
         this.animUp = animUp;
+
+        this.context = context;
     }
 
     /**
@@ -96,13 +108,14 @@ public class RepeatListener implements View.OnTouchListener {
      *
      * Note: For buttons, this event Handler returns false, so that the other event handlers
      * of buttons get called. For other views this event Handler consumes the event
-     * @param view
-     * @param motionEvent
-     * @return
+     * @param view View
+     * @param motionEvent Motion Event
+     * @return Wether the event was consumed
      */
     public boolean onTouch(View view, MotionEvent motionEvent) {
         switch (motionEvent.getAction()) {
             case MotionEvent.ACTION_DOWN:
+                UIUtils.handleVibration(context, view);
                 repeatHandler.removeCallbacks(handlerRunnable);
                 if (initialInterval >= 0) {
                     repeatHandler.postDelayed(handlerRunnable, initialInterval);
@@ -130,5 +143,4 @@ public class RepeatListener implements View.OnTouchListener {
         // Consume the event for views other than buttons
         return !((view instanceof Button) || (view instanceof ImageButton));
     }
-
 }

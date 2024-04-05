@@ -17,6 +17,8 @@ package org.xbmc.kore.utils;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
@@ -26,40 +28,39 @@ import android.os.Build;
 import android.text.TextUtils;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Because every project needs one of these
  * */
 public class Utils {
+    private static final String TAG = LogUtils.makeLogTag(Utils.class);
 
-    /**
-     * Returns whether the SDK is the Jellybean release or later.
-     */
-    public static boolean isJellybeanOrLater() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN;
+    public static boolean isOreoOrLater() { return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O; }
+
+    public static boolean isOreoMR1OrLater() { return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1; }
+
+    public static boolean isROrLater() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
     }
 
-    public static boolean isJellybeanMR1OrLater() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1;
+    public static boolean isSOrLater() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
     }
 
-    public static boolean isJellybeanMR2OrLater() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2;
+    public static boolean isTiramisuOrLater() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU;
     }
 
-    public static boolean isKitKatOrLater() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT;
-    }
-
-    public static boolean isLollipopOrLater() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
+    public static boolean isUpsideDownCakeOrLater() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE;
     }
 
     /**
-     * Concats a list of strings...
-     * @param list
-     * @param delimiter
-     * @return
+     * Concats a list of strings
+     * @param list List to concatenate
+     * @param delimiter Delimiter
+     * @return Strings concatenated
      */
     public static String listStringConcat(List<String> list, String delimiter) {
         StringBuilder builder = new StringBuilder();
@@ -73,69 +74,30 @@ public class Utils {
         return builder.toString();
     }
 
-
     /**
-     * Calls {@link Context#startActivity(Intent)} with the given <b>implicit</b> {@link Intent}
-     * after making sure there is an Activity to handle it.
-     * <br> <br> This may happen if e.g. the web browser has been disabled through restricted
-     * profiles.
-     *
-     * @return Whether there was an Activity to handle the given {@link Intent}.
+     * Launches a Google Search for the specified terms
+     * @param context Context
+     * @param searchTerms Search terms
      */
-    public static boolean tryStartActivity(Context context, Intent intent) {
-        if (intent.resolveActivity(context.getPackageManager()) != null) {
-            context.startActivity(intent);
-            return true;
-        }
-        return false;
-    }
+    public static void launchWebSearchForTerms(Context context, String searchTerms) {
+        if (context == null || TextUtils.isEmpty(searchTerms)) return;
 
-    public static final String IMDB_APP_PERSON_SEARCH_URI = "imdb:///find?q=%s&s=nm";
-    public static final String IMDB_PERSON_SEARCH_URL = "http://m.imdb.com/find?q=%s&s=nm";
-
-    public static final String IMDB_APP_MOVIE_URI = "imdb:///title/%s/";
-    public static final String IMDB_MOVIE_URL = "http://m.imdb.com/title/%s/";
-
-    /**
-     * Open the IMDb app or web page for the given person name.
-     */
-    public static void openImdbForPerson(Context context, String name) {
-        if (context == null || TextUtils.isEmpty(name)) {
-            return;
-        }
-
-        Intent intent = new Intent(Intent.ACTION_VIEW,
-                Uri.parse(String.format(IMDB_APP_PERSON_SEARCH_URI, name)));
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
-        // try launching IMDb app
-        if (!Utils.tryStartActivity(context, intent)) {
-            // on failure, try launching the web page
-            intent = new Intent(Intent.ACTION_VIEW, Uri.parse(String.format(IMDB_PERSON_SEARCH_URL, name)));
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
-            context.startActivity(intent);
-        }
+        String searchUrl = String.format("https://www.google.com/search?q=%s", searchTerms);
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(searchUrl));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+        context.startActivity(intent);
     }
 
     /**
-     * Open the IMDb app or web page for the given person name.
+     * Restrict a value to a range
+     * @param value Value
+     * @param min Range minimum
+     * @param max Range maximum
+     * @return Value if between [min, max], min or max
      */
-    public static void openImdbForMovie(Context context, String imdbNumber) {
-        if (context == null || TextUtils.isEmpty(imdbNumber)) {
-            return;
-        }
-
-        Intent intent = new Intent(Intent.ACTION_VIEW,
-                Uri.parse(String.format(IMDB_APP_MOVIE_URI, imdbNumber)));
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
-        // try launching IMDb app
-        if (!Utils.tryStartActivity(context, intent)) {
-            // on failure, try launching the web page
-            intent = new Intent(Intent.ACTION_VIEW, Uri.parse(String.format(IMDB_MOVIE_URL, imdbNumber)));
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
-            context.startActivity(intent);
-        }
+    public static float clamp(float value, float min, float max) {
+        return Math.min(max, Math.max(min, value));
     }
-
 
     /**
      * Converts a drawable to a bitmap
@@ -153,5 +115,29 @@ public class Utils {
         drawable.draw(canvas);
 
         return bitmap;
+    }
+
+    public static void setLocale(Context context, String localeName) {
+        Locale locale = getLocale(localeName);
+
+        Locale.setDefault(locale);
+
+        Resources resources = context.getResources();
+
+        Configuration configuration = resources.getConfiguration();
+        configuration.locale = locale;
+
+        resources.updateConfiguration(configuration, resources.getDisplayMetrics());
+    }
+
+    public static Locale getLocale(String localeName) {
+        Locale locale;
+        String[] languageAndRegion = localeName.split("-", 2);
+        if (languageAndRegion.length > 1) {
+            locale = new Locale(languageAndRegion[0], languageAndRegion[1]);
+        } else {
+            locale = new Locale(localeName);
+        }
+        return locale;
     }
 }

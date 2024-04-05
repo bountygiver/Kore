@@ -15,9 +15,16 @@
  */
 package org.xbmc.kore.jsonrpc.type;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.xbmc.kore.utils.JsonUtils;
 
 import java.util.List;
@@ -35,6 +42,10 @@ public class ListType {
         public static final String TYPE_EPISODE = "episode";
         public static final String TYPE_SONG = "song";
         public static final String TYPE_MUSIC_VIDEO = "musicvideo";
+        public static final String TYPE_UNKNOWN = "unknown";
+        public static final String TYPE_PICTURE = "picture";
+        public static final String TYPE_CHANNEL = "channel";
+        public static final String TYPE_ALBUM = "album";
 
         // From List.Item.Base
         public static final String ALBUM = "album";
@@ -272,12 +283,18 @@ public class ListType {
             track = JsonUtils.intFromJsonNode(node, TRACK, 0);
             trailer = JsonUtils.stringFromJsonNode(node, TRAILER, null);
             tvshowid = JsonUtils.intFromJsonNode(node, TVSHOWID, -1);
-            type = JsonUtils.stringFromJsonNode(node, TYPE, null);
+            type = JsonUtils.stringFromJsonNode(node, TYPE, TYPE_UNKNOWN);
 //            uniqueid = getStringMap(node, UNIQUEID);
             votes = JsonUtils.stringFromJsonNode(node, VOTES, null);
             watchedepisodes = JsonUtils.intFromJsonNode(node, WATCHEDEPISODES, -1);
             writer = JsonUtils.stringListFromJsonNode(node, WRITER);
             year = JsonUtils.intFromJsonNode(node, YEAR, -1);
+        }
+
+        @Override
+        public boolean equals(@Nullable Object obj) {
+            return obj instanceof ItemBase &&
+                   this.id == ((ItemBase) obj).id;
         }
     }
 
@@ -338,86 +355,112 @@ public class ListType {
         }
     }
 
+    public static class LimitsReturned {
+        public int start = -1;
+        public int end = -1;
+        public int total = -1;
+
+        public LimitsReturned(ObjectNode jsonNode) {
+            JsonNode resultNode = jsonNode.get("result");
+            JsonNode item = resultNode.has("limits") ? resultNode.get("limits") : null;
+            if (item == null) {
+                return;
+            }
+
+            start = JsonUtils.intFromJsonNode(item, "start");
+            end = JsonUtils.intFromJsonNode(item, "end");
+            total = JsonUtils.intFromJsonNode(item, "total");
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            return super.toString() +
+                             ", start="+start+
+                             ", end="+end+
+                             ", total="+total;
+        }
+    }
 
     /**
      * Enums for List.Fields.All
      */
     public interface FieldsAll {
         // We are ignoring Item.Fields.Base as it seems to have nothing useful
-        public final String TITLE = "title";
-        public final String ARTIST = "artist";
-        public final String ALBUMARTIST = "albumartist";
-        public final String GENRE = "genre";
-        public final String YEAR = "year";
-        public final String RATING = "rating";
-        public final String ALBUM = "album";
-        public final String TRACK = "track";
-        public final String DURATION = "duration";
-        public final String COMMENT = "comment";
-        public final String LYRICS = "lyrics";
-        public final String MUSICBRAINZTRACKID = "musicbrainztrackid";
-        public final String MUSICBRAINZARTISTID = "musicbrainzartistid";
-        public final String MUSICBRAINZALBUMID = "musicbrainzalbumid";
-        public final String MUSICBRAINZALBUMARTISTID = "musicbrainzalbumartistid";
-        public final String PLAYCOUNT = "playcount";
-        public final String FANART = "fanart";
-        public final String DIRECTOR = "director";
-        public final String TRAILER = "trailer";
-        public final String TAGLINE = "tagline";
-        public final String PLOT = "plot";
-        public final String PLOTOUTLINE = "plotoutline";
-        public final String ORIGINALTITLE = "originaltitle";
-        public final String LASTPLAYED = "lastplayed";
-        public final String WRITER = "writer";
-        public final String STUDIO = "studio";
-        public final String MPAA = "mpaa";
-        public final String CAST = "cast";
-        public final String COUNTRY = "country";
-        public final String IMDBNUMBER = "imdbnumber";
-        public final String PREMIERED = "premiered";
-        public final String PRODUCTIONCODE = "productioncode";
-        public final String RUNTIME = "runtime";
-        public final String SET = "set";
-        public final String SHOWLINK = "showlink";
-        public final String STREAMDETAILS = "streamdetails";
-        public final String TOP250 = "top250";
-        public final String VOTES = "votes";
-        public final String FIRSTAIRED = "firstaired";
-        public final String SEASON = "season";
-        public final String EPISODE = "episode";
-        public final String SHOWTITLE = "showtitle";
-        public final String THUMBNAIL = "thumbnail";
-        public final String FILE = "file";
-        public final String RESUME = "resume";
-        public final String ARTISTID = "artistid";
-        public final String ALBUMID = "albumid";
-        public final String TVSHOWID = "tvshowid";
-        public final String SETID = "setid";
-        public final String WATCHEDEPISODES = "watchedepisodes";
-        public final String DISC = "disc";
-        public final String TAG = "tag";
-        public final String ART = "art";
-        public final String GENREID = "genreid";
-        public final String DISPLAYARTIST = "displayartist";
-        public final String ALBUMARTISTID = "albumartistid";
-        public final String DESCRIPTION = "description";
-        public final String THEME = "theme";
-        public final String MOOD = "mood";
-        public final String STYLE = "style";
-        public final String ALBUMLABEL = "albumlabel";
-        public final String SORTTITLE = "sorttitle";
-        public final String EPISODEGUIDE = "episodeguide";
-        public final String UNIQUEID = "uniqueid";
-        public final String DATEADDED = "dateadded";
-        public final String CHANNEL = "channel";
-        public final String CHANNELTYPE = "channeltype";
-        public final String HIDDEN = "hidden";
-        public final String LOCKED = "locked";
-        public final String CHANNELNUMBER = "channelnumber";
-        public final String STARTTIME = "starttime";
-        public final String ENDTIME = "endtime";
+        String TITLE = "title";
+        String ARTIST = "artist";
+        String ALBUMARTIST = "albumartist";
+        String GENRE = "genre";
+        String YEAR = "year";
+        String RATING = "rating";
+        String ALBUM = "album";
+        String TRACK = "track";
+        String DURATION = "duration";
+        String COMMENT = "comment";
+        String LYRICS = "lyrics";
+        String MUSICBRAINZTRACKID = "musicbrainztrackid";
+        String MUSICBRAINZARTISTID = "musicbrainzartistid";
+        String MUSICBRAINZALBUMID = "musicbrainzalbumid";
+        String MUSICBRAINZALBUMARTISTID = "musicbrainzalbumartistid";
+        String PLAYCOUNT = "playcount";
+        String FANART = "fanart";
+        String DIRECTOR = "director";
+        String TRAILER = "trailer";
+        String TAGLINE = "tagline";
+        String PLOT = "plot";
+        String PLOTOUTLINE = "plotoutline";
+        String ORIGINALTITLE = "originaltitle";
+        String LASTPLAYED = "lastplayed";
+        String WRITER = "writer";
+        String STUDIO = "studio";
+        String MPAA = "mpaa";
+        String CAST = "cast";
+        String COUNTRY = "country";
+        String IMDBNUMBER = "imdbnumber";
+        String PREMIERED = "premiered";
+        String PRODUCTIONCODE = "productioncode";
+        String RUNTIME = "runtime";
+        String SET = "set";
+        String SHOWLINK = "showlink";
+        String STREAMDETAILS = "streamdetails";
+        String TOP250 = "top250";
+        String VOTES = "votes";
+        String FIRSTAIRED = "firstaired";
+        String SEASON = "season";
+        String EPISODE = "episode";
+        String SHOWTITLE = "showtitle";
+        String THUMBNAIL = "thumbnail";
+        String FILE = "file";
+        String RESUME = "resume";
+        String ARTISTID = "artistid";
+        String ALBUMID = "albumid";
+        String TVSHOWID = "tvshowid";
+        String SETID = "setid";
+        String WATCHEDEPISODES = "watchedepisodes";
+        String DISC = "disc";
+        String TAG = "tag";
+        String ART = "art";
+        String GENREID = "genreid";
+        String DISPLAYARTIST = "displayartist";
+        String ALBUMARTISTID = "albumartistid";
+        String DESCRIPTION = "description";
+        String THEME = "theme";
+        String MOOD = "mood";
+        String STYLE = "style";
+        String ALBUMLABEL = "albumlabel";
+        String SORTTITLE = "sorttitle";
+        String EPISODEGUIDE = "episodeguide";
+        String UNIQUEID = "uniqueid";
+        String DATEADDED = "dateadded";
+        String CHANNEL = "channel";
+        String CHANNELTYPE = "channeltype";
+        String HIDDEN = "hidden";
+        String LOCKED = "locked";
+        String CHANNELNUMBER = "channelnumber";
+        String STARTTIME = "starttime";
+        String ENDTIME = "endtime";
 
-        public final String[] allValues = new String[] {
+        String[] allValues = new String[] {
                 TITLE, ARTIST, ALBUMARTIST, GENRE, YEAR, RATING, ALBUM, TRACK, DURATION, COMMENT,
                 LYRICS, MUSICBRAINZTRACKID, MUSICBRAINZARTISTID, MUSICBRAINZALBUMID,
                 MUSICBRAINZALBUMARTISTID, PLAYCOUNT, FANART, DIRECTOR, TRAILER, TAGLINE, PLOT,
@@ -428,6 +471,93 @@ public class ListType {
                 DISPLAYARTIST, ALBUMARTISTID, DESCRIPTION, THEME, MOOD, STYLE, ALBUMLABEL,
                 SORTTITLE, EPISODEGUIDE, UNIQUEID, DATEADDED, CHANNEL, CHANNELTYPE, HIDDEN,
                 LOCKED, CHANNELNUMBER, STARTTIME, ENDTIME
+        };
+    }
+
+    /**
+     * Enums for List.Fields.Files
+     */
+    public interface FieldsFiles {
+        // We are ignoring Item.Fields.Base as it seems to have nothing useful
+        String TITLE = "title";
+        String ARTIST = "artist";
+        String ALBUMARTIST = "albumartist";
+        String GENRE = "genre";
+        String YEAR = "year";
+        String RATING = "rating";
+        String ALBUM = "album";
+        String TRACK = "track";
+        String DURATION = "duration";
+        String COMMENT = "comment";
+        String LYRICS = "lyrics";
+        String MUSICBRAINZTRACKID = "musicbrainztrackid";
+        String MUSICBRAINZARTISTID = "musicbrainzartistid";
+        String MUSICBRAINZALBUMID = "musicbrainzalbumid";
+        String MUSICBRAINZALBUMARTISTID = "musicbrainzalbumartistid";
+        String PLAYCOUNT = "playcount";
+        String FANART = "fanart";
+        String DIRECTOR = "director";
+        String TRAILER = "trailer";
+        String TAGLINE = "tagline";
+        String PLOT = "plot";
+        String PLOTOUTLINE = "plotoutline";
+        String ORIGINALTITLE = "originaltitle";
+        String LASTPLAYED = "lastplayed";
+        String WRITER = "writer";
+        String STUDIO = "studio";
+        String MPAA = "mpaa";
+        String CAST = "cast";
+        String COUNTRY = "country";
+        String IMDBNUMBER = "imdbnumber";
+        String PREMIERED = "premiered";
+        String PRODUCTIONCODE = "productioncode";
+        String RUNTIME = "runtime";
+        String SET = "set";
+        String SHOWLINK = "showlink";
+        String STREAMDETAILS = "streamdetails";
+        String TOP250 = "top250";
+        String VOTES = "votes";
+        String FIRSTAIRED = "firstaired";
+        String SEASON = "season";
+        String EPISODE = "episode";
+        String SHOWTITLE = "showtitle";
+        String THUMBNAIL = "thumbnail";
+        String FILE = "file";
+        String RESUME = "resume";
+        String ARTISTID = "artistid";
+        String ALBUMID = "albumid";
+        String TVSHOWID = "tvshowid";
+        String SETID = "setid";
+        String WATCHEDEPISODES = "watchedepisodes";
+        String DISC = "disc";
+        String TAG = "tag";
+        String ART = "art";
+        String GENREID = "genreid";
+        String DISPLAYARTIST = "displayartist";
+        String ALBUMARTISTID = "albumartistid";
+        String DESCRIPTION = "description";
+        String THEME = "theme";
+        String MOOD = "mood";
+        String STYLE = "style";
+        String ALBUMLABEL = "albumlabel";
+        String SORTTITLE = "sorttitle";
+        String EPISODEGUIDE = "episodeguide";
+        String UNIQUEID = "uniqueid";
+        String DATEADDED = "dateadded";
+        String SIZE = "size";
+        String LASTMODIFIED = "lastmodified";
+        String MIMETYPE = "mimetype";
+
+        String[] allValues = new String[] {
+                TITLE, ARTIST, ALBUMARTIST, GENRE, YEAR, RATING, ALBUM, TRACK, DURATION, COMMENT,
+                LYRICS, MUSICBRAINZTRACKID, MUSICBRAINZARTISTID, MUSICBRAINZALBUMID,
+                MUSICBRAINZALBUMARTISTID, PLAYCOUNT, FANART, DIRECTOR, TRAILER, TAGLINE, PLOT,
+                PLOTOUTLINE, ORIGINALTITLE, LASTPLAYED, WRITER, STUDIO, MPAA, CAST, COUNTRY,
+                IMDBNUMBER, PREMIERED, PRODUCTIONCODE, RUNTIME, SET, SHOWLINK, STREAMDETAILS,
+                TOP250, VOTES, FIRSTAIRED, SEASON, EPISODE, SHOWTITLE, THUMBNAIL, FILE, RESUME,
+                ARTISTID, ALBUMID, TVSHOWID, SETID, WATCHEDEPISODES, DISC, TAG, ART, GENREID,
+                DISPLAYARTIST, ALBUMARTISTID, DESCRIPTION, THEME, MOOD, STYLE, ALBUMLABEL,
+                SORTTITLE, EPISODEGUIDE, UNIQUEID, DATEADDED, SIZE, LASTMODIFIED, MIMETYPE
         };
     }
 
@@ -463,7 +593,7 @@ public class ListType {
     /**
      * List.Sort
      */
-    public static class Sort implements ApiParameter {
+    public static class Sort implements ApiParameter, Parcelable {
         public static final String SORT_METHOD_NONE = "none";
         public static final String SORT_METHOD_LABEL = "label";
         public static final String SORT_METHOD_DATE = "date";
@@ -471,7 +601,7 @@ public class ListType {
         public static final String SORT_METHOD_FILE = "file";
         public static final String SORT_METHOD_PATH = "path";
         public static final String SORT_METHOD_DRIVETYPE = "drivetype";
-        public static final String SORT_METHOD_TYPE = "title";
+        public static final String SORT_METHOD_TITLE = "title";
         public static final String SORT_METHOD_TRACK = "track";
         public static final String SORT_METHOD_TIME = "time";
         public static final String SORT_METHOD_ARTIST = "artist";
@@ -526,5 +656,31 @@ public class ListType {
             node.put(METHOD, sort_method);
             return node;
         }
+
+        private Sort(Parcel in) {
+            this.sort_method = in.readString();
+            this.ascending_order = (in.readInt() != 0);
+            this.ignore_article = (in.readInt() != 0);
+        }
+
+        public int describeContents() {
+            return 0;
+        }
+
+        public void writeToParcel(Parcel out, int flags) {
+            out.writeString(sort_method);
+            out.writeInt(ascending_order ? 1 : 0);
+            out.writeInt(ignore_article ? 1 : 0);
+        }
+
+        public static final Parcelable.Creator<Sort> CREATOR = new Parcelable.Creator<Sort>() {
+            public Sort createFromParcel(Parcel in) {
+                return new Sort(in);
+            }
+
+            public Sort[] newArray(int size) {
+                return new Sort[size];
+            }
+        };
     }
 }

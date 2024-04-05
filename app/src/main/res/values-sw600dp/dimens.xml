@@ -17,35 +17,35 @@
 <resources>
     <dimen name="wizard_title">216dp</dimen>
 
-    <dimen name="remote_icon_size">144dp</dimen>
+    <dimen name="control_pad_size">378dp</dimen>
+    <dimen name="remote_margin_bottom">16dp</dimen>
 
     <dimen name="remote_poster_width">110dp</dimen>
     <dimen name="remote_poster_height">162dp</dimen>
 
-    <dimen name="now_playing_poster_width">140dp</dimen>
-    <dimen name="now_playing_poster_height">200dp</dimen>
-    <dimen name="now_playing_poster_margin_top">140dp</dimen>
-    <dimen name="now_playing_art_height">324dp</dimen>
+    <dimen name="info_poster_width">110dp</dimen>
+    <dimen name="info_poster_height">162dp</dimen>
+    <dimen name="info_art_height">324dp</dimen>
 
-    <dimen name="media_title_margin_top">324dp</dimen>
-    <dimen name="poster_width_plus_padding">172dp</dimen>
+    <!-- This should be = info_poster_height_square (info_poster_width) + default_paddig -->
+    <dimen name="info_poster_bottom_guideline">118dp</dimen>
 
     <dimen name="default_grid_column_width">250dp</dimen>
 
-    <dimen name="playlist_art_width">68dp</dimen>
-    <dimen name="playlist_art_heigth">86dp</dimen>
+    <dimen name="playlist_art_width">88dp</dimen>
+    <dimen name="playlist_art_heigth">88dp</dimen>
 
-    <dimen name="movielist_art_width">82dp</dimen>
+    <dimen name="movielist_art_width">86dp</dimen>
     <dimen name="movielist_art_heigth">124dp</dimen>
 
-    <dimen name="tvshowlist_art_width">82dp</dimen>
+    <dimen name="tvshowlist_art_width">86dp</dimen>
     <dimen name="tvshowlist_art_heigth">124dp</dimen>
 
-    <dimen name="seasonlist_art_width">82dp</dimen>
+    <dimen name="seasonlist_art_width">86dp</dimen>
     <dimen name="seasonlist_art_heigth">124dp</dimen>
 
-    <dimen name="episodelist_art_width">134dp</dimen>
-    <dimen name="episodelist_art_heigth">76dp</dimen>
+    <dimen name="episodelist_art_width">112dp</dimen>
+    <dimen name="episodelist_art_heigth">100dp</dimen>
 
     <dimen name="artistlist_art_width">88dp</dimen>
     <dimen name="artistlist_art_heigth">88dp</dimen>
@@ -53,22 +53,19 @@
     <dimen name="albumlist_art_width">88dp</dimen>
     <dimen name="albumlist_art_heigth">88dp</dimen>
 
-    <dimen name="albumdetail_poster_width">136dp</dimen>
-    <dimen name="albumdetail_poster_heigth">136dp</dimen>
-
     <dimen name="audiogenrelist_art_width">88dp</dimen>
     <dimen name="audiogenrelist_art_heigth">88dp</dimen>
 
     <dimen name="musicvideolist_art_width">88dp</dimen>
     <dimen name="musicvideolist_art_heigth">88dp</dimen>
 
-    <dimen name="musicvideodetail_poster_width">146dp</dimen>
-    <dimen name="musicvideodetail_poster_heigth">146dp</dimen>
-
     <dimen name="addonlist_art_width">88dp</dimen>
     <dimen name="addonlist_art_heigth">88dp</dimen>
 
-    <dimen name="addondetail_poster_width">146dp</dimen>
-    <dimen name="addondetail_poster_heigth">146dp</dimen>
+    <dimen name="channellist_art_width">88dp</dimen>
+    <dimen name="channellist_art_heigth">88dp</dimen>
+
+    <dimen name="recordinglist_art_width">88dp</dimen>
+    <dimen name="recordinglist_art_heigth">88dp</dimen>
 
 </resources>

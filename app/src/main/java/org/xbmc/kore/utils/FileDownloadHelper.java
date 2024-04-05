@@ -25,15 +25,17 @@ import android.util.Base64;
 import android.widget.Toast;
 
 import org.xbmc.kore.R;
+import org.xbmc.kore.Settings;
 import org.xbmc.kore.host.HostInfo;
 import org.xbmc.kore.jsonrpc.ApiCallback;
-import org.xbmc.kore.jsonrpc.HostConnection;
+import org.xbmc.kore.host.HostConnection;
 import org.xbmc.kore.jsonrpc.method.Files;
 import org.xbmc.kore.jsonrpc.method.JSONRPC;
 import org.xbmc.kore.jsonrpc.type.FilesType;
 
 import java.io.File;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Various methods to help with file downloading
@@ -41,11 +43,18 @@ import java.util.List;
 public class FileDownloadHelper {
     private static final String TAG = LogUtils.makeLogTag(FileDownloadHelper.class);
 
+    // These chars cause problems with DownloadManager
+    private static final String RESERVED_CHARS_REGEX = "[?]";
+
     public static final int OVERWRITE_FILES = 0,
             DOWNLOAD_WITH_NEW_NAME = 1;
 
+    public static final String NO_ARTIST_DIR = "No artist",
+            NO_MOVIE_TITLE_DIR = "No title",
+            NO_TVSHOW_TITLE_DIR = "No title";
+
     public static abstract class MediaInfo {
-        public final String fileName;
+        public String fileName;
 
         public MediaInfo(final String fileName) {
             this.fileName = fileName;
@@ -75,16 +84,18 @@ public class FileDownloadHelper {
 
         public String getAbsoluteDirectoryPath() {
             File externalFilesDir = Environment.getExternalStoragePublicDirectory(getExternalPublicDirType());
-            return externalFilesDir.getPath() + "/" + getRelativeDirectoryPath();
-
+            String filePath = externalFilesDir.getPath() + "/" + getRelativeDirectoryPath();
+            return filePath.replaceAll(RESERVED_CHARS_REGEX, "_");
         }
 
         public String getAbsoluteFilePath() {
-            return getAbsoluteDirectoryPath() + "/" + getDownloadFileName();
+            String filePath = getAbsoluteDirectoryPath() + "/" + getDownloadFileName();
+            return filePath.replaceAll(RESERVED_CHARS_REGEX, "_");
         }
 
         public String getRelativeFilePath() {
-            return getRelativeDirectoryPath() + "/" + getDownloadFileName();
+            String filePath = getRelativeDirectoryPath() + "/" + getDownloadFileName();
+            return filePath.replaceAll(RESERVED_CHARS_REGEX, "_");
         }
 
         public abstract String getExternalPublicDirType();
@@ -95,17 +106,37 @@ public class FileDownloadHelper {
         public String getDownloadDescrition(Context context) {
             return context.getString(R.string.download_file_description);
         }
+
+        public String getMediaUrl(HostInfo hostInfo) {
+            String pathforUrl = Uri.encode(fileName);
+            String credentials = (hostInfo.getPassword() == null || hostInfo.getPassword().isEmpty()) ?
+                                 "" :
+                                 String.format("%s:%s@", hostInfo.getUsername(), hostInfo.getPassword());
+            return String.format(Locale.US,
+                                 "%s://%s%s:%d/vfs/%s",
+                                 hostInfo.isHttps? "https" : "http",
+                                 credentials, hostInfo.getAddress(), hostInfo.getHttpPort(), pathforUrl);
+        }
     }
 
     /**
      * Info for downloading songs
      */
     public static class SongInfo extends MediaInfo {
-        public final String artist;
-        public final String album;
-        public final int songId;
-        public final int track;
-        public final String title;
+        public String artist;
+        public String album;
+        public int songId;
+        public int track;
+        public String title;
+
+        public SongInfo() {
+            super(null);
+            artist = null;
+            album = null;
+            songId = -1;
+            track = -1;
+            title = null;
+        }
 
         public SongInfo(final String artist, final String album,
                         final int songId, final int track, final String title,
@@ -119,14 +150,14 @@ public class FileDownloadHelper {
         }
 
         public String getRelativeDirectoryPath() {
-            return (TextUtils.isEmpty(album) || TextUtils.isEmpty(artist)) ?
-                    null : artist + "/" + album;
+            return (TextUtils.isEmpty(artist) ? NO_ARTIST_DIR :
+                    TextUtils.isEmpty(album) ? artist : artist + "/" + album);
         }
 
         public String getDownloadFileName() {
             String ext = getFilenameExtension(fileName);
             return (ext != null) ?
-                   String.valueOf(track) + " - " + title + ext :
+                   track + " - " + title + ext :
                    null;
         }
 
@@ -152,7 +183,7 @@ public class FileDownloadHelper {
 
         public String getRelativeDirectoryPath() {
             return (TextUtils.isEmpty(title)) ?
-                   null : title;
+                   NO_MOVIE_TITLE_DIR : title;
         }
 
         public String getDownloadFileName() {
@@ -191,18 +222,15 @@ public class FileDownloadHelper {
 
         public String getRelativeDirectoryPath() {
             if (season > 0) {
-                return (TextUtils.isEmpty(tvshowTitle)) ?
-                       null : tvshowTitle + "/Season" + String.valueOf(season);
+                return (TextUtils.isEmpty(tvshowTitle)) ? NO_TVSHOW_TITLE_DIR : tvshowTitle + "/Season" + season;
             } else {
-                return (TextUtils.isEmpty(tvshowTitle)) ?
-                       null : tvshowTitle;
+                return (TextUtils.isEmpty(tvshowTitle)) ? NO_TVSHOW_TITLE_DIR : tvshowTitle;
             }
         }
 
         public String getDownloadFileName() {
             String ext = getFilenameExtension(fileName);
-            return (ext != null) ?
-                   String.valueOf(episodeNumber) + " - " + title + ext : null;
+            return (ext != null) ? episodeNumber + " - " + title + ext : null;
         }
 
         public String getExternalPublicDirType() {
@@ -294,7 +322,7 @@ public class FileDownloadHelper {
                                     final List<? extends MediaInfo> mediaInfoList,
                                     final int fileHandlingMode,
                                     final Handler callbackHandler) {
-        if ((mediaInfoList == null) || (mediaInfoList.size() == 0))
+        if ((mediaInfoList == null) || (mediaInfoList.isEmpty()))
             return;
 
         if (!checkDownloadDir(context, mediaInfoList.get(0).getAbsoluteDirectoryPath()))
@@ -375,7 +403,7 @@ public class FileDownloadHelper {
                     request.addRequestHeader("Authorization", "Basic " + token);
                 }
                 request.allowScanningByMediaScanner();
-                request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI);
+                request.setAllowedNetworkTypes(Settings.allowedDownloadNetworkTypes(context));
                 request.setTitle(mediaInfo.getDownloadTitle(context));
                 request.setDescription(mediaInfo.getDownloadDescrition(context));
 
